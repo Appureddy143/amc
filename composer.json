@@ -1,0 +1,11 @@
+{
+    "name": "vvit/exam",
+    "autoload": {
+        "psr-4": {
+            "Vvit\\Exam\\": "src/"
+        }
+    },
+    "require": {
+        "phpoffice/phpspreadsheet": "^4.1"
+    }
+}

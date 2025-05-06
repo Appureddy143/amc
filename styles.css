@@ -1,0 +1,49 @@
+.content {
+    max-width: 600px;
+    margin: 20px auto;
+    padding: 20px;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+    background-color: #fff;
+}
+
+.message {
+    color: #007bff;
+    font-weight: bold;
+    margin-bottom: 15px;
+}
+
+form {
+    margin-bottom: 20px;
+}
+
+form input, form textarea {
+    width: 100%;
+    margin: 10px 0;
+    padding: 10px;
+    border: 1px solid #ddd;
+    border-radius: 3px;
+}
+
+form button {
+    background-color: #007bff;
+    color: white;
+    border: none;
+    padding: 10px 15px;
+    cursor: pointer;
+    border-radius: 3px;
+}
+
+form button:hover {
+    background-color: #007bff;
+}
+.navbar a {
+    font-size: 14px;
+    padding: 8px 12px;
+    background-color: #007bff;
+    color: white;
+    border: none;
+    padding: 10px 15px;
+    cursor: pointer;
+    border-radius: 3px;
+}
