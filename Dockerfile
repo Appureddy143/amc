@@ -1,10 +1,11 @@
 # Start from the official PHP 8.2 Apache image
 FROM php:8.2-apache
 
-# Install system dependencies required for extensions
-# - libfreetype-dev, libjpeg-dev, libpng-dev are for the GD extension
-# - libpq-dev is for PostgreSQL
-# - libzip-dev and unzip are for Composer and PhpSpreadsheet
+# Step 1: Install system-level dependencies
+# These are required by the PHP extensions we will install next.
+# - GD needs libraries for handling fonts (freetype) and images (jpeg, png).
+# - pdo_pgsql needs the PostgreSQL client library (libpq-dev).
+# - zip and Composer need unzip and zip libraries.
 RUN apt-get update && apt-get install -y \
     libfreetype6-dev \
     libjpeg62-turbo-dev \
@@ -14,25 +15,27 @@ RUN apt-get update && apt-get install -y \
     unzip \
     && apt-get clean
 
-# Configure and install the GD extension, then other required extensions
-# Using -j$(nproc) makes the installation faster
+# Step 2: Configure and install the required PHP extensions
+# The `docker-php-ext-install` command compiles and enables PHP modules.
+# We need 'gd' for PhpSpreadsheet, 'pdo_pgsql' for the database, and 'zip'.
 RUN docker-php-ext-configure gd --with-freetype --with-jpeg \
     && docker-php-ext-install -j$(nproc) gd pdo_pgsql zip
 
-# Install Composer (the PHP dependency manager)
+# Step 3: Install Composer (the PHP dependency manager) globally
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
-# Create and set permissions for the uploads directory
+# Step 4: Create and set permissions for the file uploads directory
 RUN mkdir -p /var/www/html/uploads && chown www-data:www-data /var/www/html/uploads
 
-# Set the working directory for the build
+# Step 5: Set the working directory for the rest of the build
 WORKDIR /var/www/html
 
-# Copy your composer.json file and install the dependencies
-# This is done before copying the rest of the app for better Docker caching
+# Step 6: Install PHP dependencies using Composer
+# We copy composer.json first to take advantage of Docker's caching.
+# This step will fail if composer.json has errors.
 COPY composer.json .
 RUN composer install --no-dev --optimize-autoloader
 
-# Now, copy the rest of your application files
+# Step 7: Copy the rest of your application files into the web root
 COPY . .
 
