@@ -1,38 +1,77 @@
 <?php
 session_start();
-include('db-config.php');
+include('db-config.php'); // Include your PDO database connection
 
-// Check if the user is logged in as admin
-if ($_SESSION['role'] !== 'admin') {
+// Check if the user is logged in as an admin
+if (!isset($_SESSION['role']) || $_SESSION['role'] !== 'admin') {
     header("Location: login.php");
     exit;
 }
 
-// Handle CSV upload
-if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_FILES['student_csv'])) {
-    $fileName = $_FILES['student_csv']['tmp_name'];
+// Initialize a variable to hold feedback messages
+$feedback_message = '';
 
-    if ($_FILES['student_csv']['size'] > 0) {
-        $file = fopen($fileName, "r");
-        while (($data = fgetcsv($file, 1000, ",")) !== FALSE) {
-            $usn = $conn->real_escape_string($data[0]); // USN
-            $name = $conn->real_escape_string($data[1]);
-            $email = $conn->real_escape_string($data[2]);
-            $dob = $conn->real_escape_string($data[3]);
-            $address = $conn->real_escape_string($data[4]);
-            $branch = $conn->real_escape_string($data[5]);  // Branch
-            $password = password_hash($data[6], PASSWORD_DEFAULT);
+try {
+    // --- Handle CSV Upload ---
+    if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_FILES['student_csv']) && $_FILES['student_csv']['error'] === UPLOAD_ERR_OK) {
+        $fileName = $_FILES['student_csv']['tmp_name'];
 
-            // Insert student into the database
-            $query = "INSERT INTO users (usn, first_name, email, dob, address, password, branch, role) 
-                      VALUES ('$usn', '$name', '$email', '$dob', '$address', '$password', '$branch', 'student')";
-            $conn->query($query);
+        if ($_FILES['student_csv']['size'] > 0) {
+            $file = fopen($fileName, "r");
+            
+            $conn->beginTransaction();
+            
+            // Prepare the statement once before the loop
+            $sql = "INSERT INTO students (usn, name, email, dob, address, password) VALUES (?, ?, ?, ?, ?, ?)";
+            $stmt = $conn->prepare($sql);
+
+            // Skip the header row
+            fgetcsv($file, 1000, ",");
+
+            while (($data = fgetcsv($file, 1000, ",")) !== FALSE) {
+                // CSV columns: usn, name, email, dob, address, branch, password
+                $usn = $data[0];
+                $name = $data[1];
+                $email = $data[2];
+                $dob = $data[3];
+                $address = $data[4];
+                // We are skipping branch ($data[5]) as it's not in the students table
+                $password = password_hash($data[6], PASSWORD_DEFAULT);
+
+                $stmt->execute([$usn, $name, $email, $dob, $address, $password]);
+            }
+            
+            $conn->commit();
+            fclose($file);
+            $feedback_message = "<p class='success-message'>✅ Students from CSV uploaded successfully!</p>";
+        } else {
+            throw new Exception("Please upload a valid CSV file.");
         }
-        fclose($file);
-        $message = "Students added successfully!";
-    } else {
-        $message = "Please upload a valid CSV file.";
     }
+
+    // --- Handle Manual Student Entry ---
+    if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['manual_add_student'])) {
+        $usn = trim($_POST['usn']);
+        $name = trim($_POST['name']);
+        $email = trim($_POST['email']);
+        $dob = $_POST['dob'];
+        $address = trim($_POST['address']);
+        $password = password_hash($_POST['password'], PASSWORD_DEFAULT);
+
+        $sql = "INSERT INTO students (usn, name, email, dob, address, password) VALUES (?, ?, ?, ?, ?, ?)";
+        $stmt = $conn->prepare($sql);
+        $stmt->execute([$usn, $name, $email, $dob, $address, $password]);
+
+        $feedback_message = "<p class='success-message'>✅ Student added successfully!</p>";
+    }
+
+} catch (PDOException $e) {
+    if ($conn->inTransaction()) {
+        $conn->rollBack();
+    }
+    $feedback_message = "<p class='error-message'>❌ Database Error: " . $e->getMessage() . "</p>";
+} catch (Exception $e) {
+    $feedback_message = "<p class='error-message'>❌ Error: " . $e->getMessage() . "</p>";
 }
 ?>
 
@@ -41,165 +80,60 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_FILES['student_csv'])) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Add Student</title>
-    <link rel="stylesheet" href="styles.css">
+    <title>Add Students</title>
     <style>
-        /* General styles */
-        body {
-            font-family: Arial, sans-serif;
-            margin: 0;
-            padding: 0;
-            background-color: #f4f4f9;
-        }
-
-        .navbar {
-            background-color: #333;
-            padding: 10px;
-            text-align: center;
-        }
-
-        .navbar a {
-            color: #fff;
-            text-decoration: none;
-            font-size: 18px;
-        }
-
-        .navbar a:hover {
-            color: #f1f1f1;
-        }
-
-        /* Content Section */
-        .content {
-            width: 85%; /* Increased width from 80% to 85% */
-            margin: 0 auto;
-            padding: 20px;
-            background-color: #fff;
-            border-radius: 8px;
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-        }
-
-        h2 {
-            color: #333;
-            text-align: center;
-        }
-
-        h3 {
-            color: #555;
-            margin-top: 20px;
-        }
-
-        .message {
-            color: green;
-            font-weight: bold;
-            text-align: center;
-        }
-
-        form {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-        }
-
-        input, textarea, select, button {
-            width: 80%;
-            max-width: 400px;
-            padding: 10px;
-            margin: 10px 0;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            font-size: 16px;
-        }
-
-        input[type="file"] {
-            width: 80%;
-            max-width: 400px;
-        }
-
-        textarea {
-            height: 100px;
-            resize: vertical;
-        }
-
-        button {
-            background-color: #4CAF50;
-            color: white;
-            cursor: pointer;
-            transition: background-color 0.3s ease;
-        }
-
-        button:hover {
-            background-color: #45a049;
-        }
-
-        button[type="button"] {
-            background-color: #007bff;
-            border: none;
-        }
-
-        button[type="button"]:hover {
-            background-color: #0056b3;
-        }
-
-        /* Responsive Design */
-        @media (max-width: 600px) {
-            .content {
-                width: 90%;
-            }
-
-            input, textarea, button {
-                width: 100%;
-            }
-        }
+        body { font-family: Arial, sans-serif; margin: 0; padding: 0; background-color: #f4f4f9; color: #333; }
+        .navbar { background-color: #333; padding: 12px; text-align: right; }
+        .navbar a { color: #fff; text-decoration: none; font-size: 16px; margin: 0 15px; }
+        .content { width: 90%; max-width: 800px; margin: 20px auto; padding: 20px; background-color: #fff; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        h2, h3 { text-align: center; }
+        form { display: flex; flex-direction: column; align-items: center; gap: 10px; margin-top: 20px; padding: 20px; border: 1px solid #eee; border-radius: 5px; }
+        input, textarea, select, button { width: 100%; max-width: 400px; padding: 10px; border: 1px solid #ddd; border-radius: 4px; font-size: 16px; box-sizing: border-box; }
+        textarea { height: 100px; resize: vertical; }
+        button { background-color: #28a745; color: white; cursor: pointer; border: none; transition: background-color 0.3s ease; }
+        button:hover { background-color: #218838; }
+        .csv-form button[type="button"] { background-color: #007bff; }
+        .csv-form button[type="button"]:hover { background-color: #0056b3; }
+        .error-message { color: #dc3545; background-color: #f8d7da; border: 1px solid #f5c6cb; padding: 10px; border-radius: 5px; margin-bottom: 15px; text-align: center; }
+        .success-message { color: #155724; background-color: #d4edda; border: 1px solid #c3e6cb; padding: 10px; border-radius: 5px; margin-bottom: 15px; text-align: center; }
     </style>
 </head>
 <body>
     <div class="navbar">
-        <a href="admin-panel.php">Back to Admin Panel</a>
+        <a href="admin_dashboard.php">Back to Admin Dashboard</a>
     </div>
     <div class="content">
-        <h2>Add Student</h2>
-        <?php if (isset($message)) echo "<p class='message'>$message</p>"; ?>
+        <h2>Add Students</h2>
+
+        <?php if (!empty($feedback_message)) echo $feedback_message; ?>
 
         <h3>Upload CSV for Bulk Registration</h3>
-        <form action="add-student.php" method="POST" enctype="multipart/form-data">
+        <form class="csv-form" action="add-student.php" method="POST" enctype="multipart/form-data">
+            <p>CSV format: usn, name, email, dob, address, branch, password</p>
             <input type="file" name="student_csv" accept=".csv" required>
-            <button type="submit" class="btn">Upload</button>
-            <button type="button" class="btn" onclick="downloadFile()">Sample CSV</button>
+            <button type="submit">Upload CSV</button>
+            <button type="button" onclick="downloadFile()">Download Sample CSV</button>
         </form>
 
-        <h3>Manually Add a Student</h3>
-        <form action="manual-add-student.php" method="POST">
+        <h3>Or Manually Add a Single Student</h3>
+        <form action="add-student.php" method="POST">
+            <input type="hidden" name="manual_add_student" value="1">
             <input type="text" name="usn" placeholder="USN" required>
             <input type="text" name="name" placeholder="Full Name" required>
             <input type="email" name="email" placeholder="Email" required>
             <input type="date" name="dob" placeholder="Date of Birth" required>
             <textarea name="address" placeholder="Address"></textarea>
-
-            <!-- Branch Selection -->
-            <select name="branch" required>
-            <option value="CSE">CSE</option>
-                <option value="ECE">ECE</option>
-                <option value="MECH">MECH</option>
-                <option value="CIVIL">CIVIL</option>
-                <!-- Add more branches as required -->
-            </select>
-
             <input type="password" name="password" placeholder="Password" required>
-            <button type="submit" class="btn">Add Student</button>
+            <button type="submit">Add Student</button>
         </form>
     </div>
 
     <script>
         function downloadFile() {
-            // Specify the file URL
-            const fileUrl = 'sample.csv';  // Replace with the actual file path
-
-            // Create an anchor element
+            // Create a link and trigger a click to download the sample file
             const a = document.createElement('a');
-            a.href = fileUrl;
-            a.download = 'sample.csv';  // Set the file name
-
-            // Trigger the download
+            a.href = 'sample.csv';
+            a.download = 'sample.csv';
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
