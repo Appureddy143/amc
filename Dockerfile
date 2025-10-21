@@ -5,8 +5,6 @@ FROM php:8.2-apache
 # --- DEPENDENCIES ---
 
 # Install essential system libraries and PHP extensions.
-# Added: libzip-dev (for zip), libicu-dev (for intl)
-# Added extensions: zip, intl, bcmath
 RUN apt-get update && apt-get install -y \
     libpng-dev \
     libjpeg-dev \
@@ -40,10 +38,13 @@ RUN composer install --no-interaction --optimize-autoloader --no-dev
 # Copy the rest of your application's source code.
 COPY . .
 
-# Set the correct permissions for storage and cache directories.
-# This is crucial for frameworks like Laravel.
+# --- PERMISSIONS FIX ---
+
+# Create the storage and cache directories if they don't exist,
+# then set the correct permissions. This prevents errors if they are in .gitignore.
 # The 'www-data' user is the one Apache runs as.
-RUN chown -R www-data:www-data storage bootstrap/cache
+RUN mkdir -p storage bootstrap/cache && \
+    chown -R www-data:www-data storage bootstrap/cache
 
 
 # --- RENDER CONFIGURATION ---
