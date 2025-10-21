@@ -45,23 +45,23 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 switch (strtolower(trim($row['role']))) {
     case 'admin':
         // This file exists in your repository.
-        header("Location: admin_dashboard.php");
+        header("Location: admin-panel.php");
         exit;
 
     case 'staff':
         // TODO: You will need to create a 'staff_dashboard.php' file for staff members.
-        header("Location: staff_dashboard.php");
+        header("Location: staff-panel.php");
         exit;
         
     case 'hod':
         // TODO: You will need to create a 'hod_dashboard.php' file for HODs.
-        header("Location: hod_dashboard.php");
+        header("Location: hod-panel.php");
         exit;
         
     case 'principal':
         // TODO: You will need to create a 'principal_dashboard.php' file for the principal.
         // Alternatively, you could redirect them to the HOD dashboard if they share functionality.
-        header("Location: principal_dashboard.php"); 
+        header("Location: principal-panel.php"); 
         exit;
 
     default:
