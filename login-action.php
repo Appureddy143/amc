@@ -42,15 +42,35 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 $_SESSION['role'] = $row['role'];
                 $_SESSION['branch'] = isset($row['branch']) ? $row['branch'] : 'N/A';
 
-                switch (strtolower(trim($row['role']))) {
-                    case 'admin':
-                        header("Location: admin_dashboard.php"); // Corrected filename
-                        exit;
-                    // ... other cases
-                    default:
-                         header("Location: admin_dashboard.php"); // Fallback
-                         exit;
-                }
+switch (strtolower(trim($row['role']))) {
+    case 'admin':
+        // This file exists in your repository.
+        header("Location: admin_dashboard.php");
+        exit;
+
+    case 'staff':
+        // TODO: You will need to create a 'staff_dashboard.php' file for staff members.
+        header("Location: staff_dashboard.php");
+        exit;
+        
+    case 'hod':
+        // TODO: You will need to create a 'hod_dashboard.php' file for HODs.
+        header("Location: hod_dashboard.php");
+        exit;
+        
+    case 'principal':
+        // TODO: You will need to create a 'principal_dashboard.php' file for the principal.
+        // Alternatively, you could redirect them to the HOD dashboard if they share functionality.
+        header("Location: principal_dashboard.php"); 
+        exit;
+
+    default:
+        // This is a safe fallback for any other roles (like 'student') or unexpected values.
+        // It prevents unauthorized access and provides a clear error message.
+        $_SESSION['error'] = 'Your user role does not have a dashboard assigned.';
+        header("Location: login.php");
+        exit;
+}
 
             } else {
                 // --- LOGIN FAIL ---
