@@ -129,7 +129,7 @@ try {
         <a href="logout.php">Logout</a>
         <a href="add-staff.php">Add Staff </a>
         <a href="add-student.php">Add Student</a>
-        <a href="view-student.php">View Student</a>
+        <a href="view-students.php">View Student</a>
         <a href="add-subject.php">Add Subjects</a>
         <a href="subject-allocation.php">Allocate Subjects</a>
         <a href="create-timetable.php">Create Timetables</a>
