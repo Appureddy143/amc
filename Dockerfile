@@ -24,18 +24,19 @@ RUN docker-php-ext-configure gd --with-freetype --with-jpeg \
 # Step 3: Install Composer (the PHP dependency manager) globally
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
-# Step 4: Create and set permissions for the file uploads directory
-RUN mkdir -p /var/www/html/uploads && chown www-data:www-data /var/www/html/uploads
-
-# Step 5: Set the working directory for the rest of the build
+# Step 4: Set the working directory for the rest of the build
 WORKDIR /var/www/html
 
-# Step 6: Install PHP dependencies using Composer
+# Step 5: Install PHP dependencies using Composer
 # We copy composer.json first to take advantage of Docker's caching.
 # This step will fail if composer.json has errors.
 COPY composer.json .
 RUN composer install --no-dev --optimize-autoloader
 
-# Step 7: Copy the rest of your application files into the web root
+# Step 6: Copy the rest of your application files into the web root
 COPY . .
+
+# Step 7 (FINAL STEP): Set permissions for the uploads directory AFTER all files are copied.
+# This ensures that even if an 'uploads' folder exists in the repo, its permissions are corrected.
+RUN mkdir -p /var/www/html/uploads && chown -R www-data:www-data /var/www/html/uploads
 
