@@ -1,18 +1,20 @@
 <?php
 // db-config.php
 
-// Details parsed from your Neon PostgreSQL connection string:
-// postgresql://neondb_owner:npg_yC76ISxjPlBh@ep-wandering-hall-a4dwdmsw-pooler.us-east-1.aws.neon.tech/neondb?sslmode=require
+// Get database details from Render Environment Variables
+$host = getenv('DB_HOST');
+$port = getenv('DB_PORT');
+$database = getenv('DB_NAME');
+$username = getenv('DB_USER');
+$password = getenv('DB_PASSWORD');
+$sslmode = "require"; // Always require for Neon
 
-$host = "ep-wandering-hall-a4dwdmsw-pooler.us-east-1.aws.neon.tech";
-$port = "5432"; // Default PostgreSQL port
-$database = "neondb";
-$username = "neondb_owner";
-$password = "npg_yC76ISxjPlBh";
-$sslmode = "require"; // Required for Neon
+// Check if any environment variables are missing
+if (empty($host) || empty($port) || empty($database) || empty($username) || empty($password)) {
+    die("Connection failed: Database environment variables are not set.");
+}
 
 // Create the DSN (Data Source Name) for PDO
-// This tells PDO which driver to use (pgsql) and the connection details.
 $dsn = "pgsql:host=$host;port=$port;dbname=$database;sslmode=$sslmode";
 
 try {
