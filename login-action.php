@@ -1,9 +1,4 @@
 <?php
-echo "LOGIN-ACTION.PHP IS RUNNING. CHECKING DB CONFIG...";
-die(); 
-
-// session_start(); ... (rest of your code)
-<?php
 // Start session and include your PDO database connection
 session_start();
 // 1. Include the PDO database configuration
