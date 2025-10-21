@@ -1,3 +1,5 @@
+<?php phpinfo(); ?>
+/*
 <?php
 // Start session and include your PDO database connection
 session_start();
@@ -91,6 +93,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         header("Location: login.php");
         exit;
     }
+    */
 }
 
 // 7. Close the PDO connection
