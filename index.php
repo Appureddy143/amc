@@ -181,7 +181,7 @@ a:hover {
         </div>
 
         <div class="content">
-            <h1>Welcome to the VVIT College Exam Section</h1>
+            <h1>Welcome to the AMC College Exam Section</h1>
             <p>Prepare your question papers and manage exam schedules directly online!</p>
         </div>
         
