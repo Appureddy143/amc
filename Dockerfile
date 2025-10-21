@@ -1,23 +1,30 @@
-# Start from the same base image Render is using
+# Start from the official PHP 8.2 Apache image
 FROM php:8.2-apache
 
-# 1. Install system dependencies for PostgreSQL (libpq-dev)
+# Install system dependencies required for extensions
+# zip/unzip are for Composer and PhpSpreadsheet
 RUN apt-get update && apt-get install -y \
     libpq-dev \
+    libzip-dev \
+    unzip \
     && apt-get clean
 
-# 2. Use the official PHP command to install and enable the pdo_pgsql extension
-RUN docker-php-ext-install pdo_pgsql
+# Install required PHP extensions (pdo_pgsql for database, zip for excel files)
+RUN docker-php-ext-install pdo_pgsql zip
 
-# --- NEW LINES START HERE ---
+# Install Composer (the PHP dependency manager)
+COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
-# 3. Create the 'uploads' directory inside the web root
-RUN mkdir -p /var/www/html/uploads
+# Create and set permissions for the uploads directory
+RUN mkdir -p /var/www/html/uploads && chown www-data:www-data /var/www/html/uploads
 
-# 4. Change the owner of the 'uploads' directory to the web server user (www-data)
-RUN chown www-data:www-data /var/www/html/uploads
+# Set the working directory
+WORKDIR /var/www/html
 
-# --- NEW LINES END HERE ---
+# Copy composer files and install dependencies
+# This is done before copying the app for better Docker caching
+COPY composer.json .
+RUN composer install --no-dev --optimize-autoloader
 
-# 5. Copy all your project files into the server's web directory
-COPY . /var/www/html/
+# Copy the rest of the application files
+COPY . .
