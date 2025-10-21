@@ -51,5 +51,5 @@ RUN mkdir -p storage bootstrap/cache && \
 
 # Render provides the PORT environment variable.
 # We need to configure Apache to listen on this port.
-# This command overwrites the default port configuration.
-RUN echo "Listen \${PORT:-10000}" > /etc/apache2/ports.conf
+# Using single quotes ensures the variable is evaluated at runtime, not build time.
+RUN echo 'Listen ${PORT:-10000}' > /etc/apache2/ports.conf
