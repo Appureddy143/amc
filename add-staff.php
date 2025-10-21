@@ -176,7 +176,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             <button type="submit">Add Staff</button>
         </form>
 
-        <a href="admin_dashboard.php" class="back-to-dashboard">Back to Dashboard</a>
+        <a href="admin-panel.php" class="back-to-dashboard">Back to Dashboard</a>
     </div>
 </body>
 </html>
