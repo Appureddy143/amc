@@ -176,7 +176,8 @@ h1, h2, h3, h4 {
     <!-- Background Video -->
     <div class="video-background">
         <video autoplay muted loop id="bg-video">
-            <source src="video/back.mp4" type="video/mp4">
+            <!-- NOTE: Make sure this video path is correct relative to your project structure -->
+            <source src="assets/video/back.mp4" type="video/mp4">
             Your browser does not support the video tag.
         </video>
     </div>
@@ -184,8 +185,23 @@ h1, h2, h3, h4 {
     <!-- Login Form -->
     <div class="login-container">
         <div class="login-form">
-            <h2 >Login</h2>
+            <h2>Login</h2>
+            
             <form action="login-action.php" method="POST">
+
+                <!-- START: ERROR MESSAGE DISPLAY -->
+                <?php
+                // Check if an error message is set in the session
+                if (isset($_SESSION['error'])) {
+                    // Display the error message in red
+                    echo '<p style="color: #ff4d4d; text-align: center; font-weight: bold; margin-bottom: 15px;">' . htmlspecialchars($_SESSION['error']) . '</p>';
+                    
+                    // Unset the error so it doesn't show again on refresh
+                    unset($_SESSION['error']);
+                }
+                ?>
+                <!-- END: ERROR MESSAGE DISPLAY -->
+
                 <div class="form-group">
                     <label for="email">Email</label>
                     <input type="email" id="email" name="email" required>
