@@ -100,7 +100,7 @@ try {
 </head>
 <body>
     <div class="navbar">
-        <a href="admin_dashboard.php">Back to Admin Dashboard</a>
+        <a href="admin_panel.php">Back to Admin Dashboard</a>
     </div>
     <div class="content">
         <h2>Add Students</h2>
