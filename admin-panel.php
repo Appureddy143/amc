@@ -126,12 +126,12 @@ try {
 </head>
 <body>
     <div class="navbar">
-        <a href="add-staff.php">Add Staff</a>
+        <a href="logout.php">Logout</a>
+        <a href="add-staff.php">Add Staff </a>
         <a href="add-student.php">Add Student</a>
         <a href="add-subject.php">Add Subjects</a>
-        <a href="bulk-upload.php">Bulk Upload</a>
-        <a href="generate-paper.php">Generate Paper</a>
-        <a href="logout.php">Logout</a>
+        <a href="subject-allocation.php">Allocate Subjects</a>
+        <a href="create-timetable.php">Create Timetables</a>
     </div>
 
     <div class="container">
