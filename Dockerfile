@@ -5,17 +5,18 @@ FROM php:8.2-apache
 # --- DEPENDENCIES ---
 
 # Install essential system libraries and PHP extensions.
-# gd: for image processing
-# pdo_mysql & mysqli: for connecting to MySQL databases
-# zip: for handling zip archives, often used by Composer
+# Added: libzip-dev (for zip), libicu-dev (for intl)
+# Added extensions: zip, intl, bcmath
 RUN apt-get update && apt-get install -y \
     libpng-dev \
     libjpeg-dev \
     libfreetype6-dev \
+    libzip-dev \
+    libicu-dev \
     zip \
     unzip \
     && docker-php-ext-configure gd --with-freetype --with-jpeg \
-    && docker-php-ext-install gd pdo pdo_mysql mysqli
+    && docker-php-ext-install gd pdo pdo_mysql mysqli zip intl bcmath
 
 # Enable Apache's mod_rewrite for friendly URLs (e.g., for Laravel, Symfony, etc.)
 RUN a2enmod rewrite
@@ -49,9 +50,5 @@ RUN chown -R www-data:www-data storage bootstrap/cache
 
 # Render provides the PORT environment variable.
 # We need to configure Apache to listen on this port.
-# The default is 80, but Render expects services to listen on 10000.
 # This command overwrites the default port configuration.
 RUN echo "Listen \${PORT:-10000}" > /etc/apache2/ports.conf
-
-# Note: You do not need a CMD or ENTRYPOINT.
-# The base php:apache image already has a command to start Apache in the foreground.
