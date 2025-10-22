@@ -174,7 +174,6 @@ $current_subject_sl_no = $subject_start_from + 1;
         <a href="add-student.php">Add Student</a>
         <a href="view-students.php">View Students</a>
         <a href="add-subject.php">Add Subjects</a>
-        <a href="bulk-upload.php">Bulk Upload</a>
         <a href="create-question.php">Generate Paper</a>
         <a href="logout.php">Logout</a>
     </div>
