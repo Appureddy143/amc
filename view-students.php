@@ -46,16 +46,20 @@ try {
     $total_students = $total_students_stmt->fetchColumn();
     $total_pages = ceil($total_students / $records_per_page);
 
-    // Fetch student details for the current page
-    $student_stmt = $conn->prepare("SELECT id, usn, name, email, branch FROM students ORDER BY id ASC LIMIT :limit OFFSET :offset");
+    // Fetch student details for the current page (Corrected: removed 'branch')
+    $student_stmt = $conn->prepare("SELECT id, usn, name, email FROM students ORDER BY id ASC LIMIT :limit OFFSET :offset");
     $student_stmt->bindValue(':limit', $records_per_page, PDO::PARAM_INT);
     $student_stmt->bindValue(':offset', $start_from, PDO::PARAM_INT);
     $student_stmt->execute();
     $students = $student_stmt->fetchAll(PDO::FETCH_ASSOC);
 
 } catch (PDOException $e) {
-    die("Database error: " . $e->getMessage());
+    die("Database error: ". $e->getMessage());
 }
+
+// --- Initialize Serial Number for display ---
+// This ensures the count continues correctly across pages
+$current_sl_no = $start_from + 1;
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -93,32 +97,32 @@ try {
         <table>
             <thead>
                 <tr>
-                    <th>ID</th>
+                    <th>Sl. No.</th> <!-- Changed from ID -->
                     <th>USN</th>
                     <th>Name</th>
                     <th>Email</th>
-                    <th>Branch</th>
                     <th>Actions</th>
                 </tr>
             </thead>
             <tbody>
                 <?php if (empty($students)): ?>
                     <tr>
-                        <td colspan="6" style="text-align: center;">No students found. <a href="add-student.php">Add one now</a>.</td>
+                        <td colspan="5" style="text-align: center;">No students found. <a href="add-student.php">Add one now</a>.</td>
                     </tr>
                 <?php else: ?>
                     <?php foreach ($students as $student): ?>
                         <tr>
-                            <td><?= htmlspecialchars($student['id']) ?></td>
+                            <td><?= $current_sl_no ?></td> <!-- Display serial number -->
                             <td><?= htmlspecialchars($student['usn']) ?></td>
                             <td><?= htmlspecialchars($student['name']) ?></td>
                             <td><?= htmlspecialchars($student['email']) ?></td>
-                            <td><?= htmlspecialchars($student['branch'] ?? 'N/A') ?></td>
                             <td>
+                                <!-- Actions still use the real, unique $student['id'] -->
                                 <a href="edit-student.php?id=<?= $student['id'] ?>" class="action-btn edit-btn">Edit</a>
                                 <a href="?delete_student=<?= $student['id'] ?>" class="action-btn remove-btn" onclick="return confirm('Are you sure you want to delete this student and all their records? This cannot be undone.')">Remove</a>
                             </td>
                         </tr>
+                        <?php $current_sl_no++; // Increment serial number for the next row ?>
                     <?php endforeach; ?>
                 <?php endif; ?>
             </tbody>
