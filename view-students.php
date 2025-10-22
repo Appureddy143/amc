@@ -88,7 +88,7 @@ $current_sl_no = $start_from + 1;
 </head>
 <body>
     <div class="navbar">
-        <a href="admin_dashboard.php">Back to Dashboard</a>
+        <a href="admin-panel.php">Back to Dashboard</a>
         <a href="logout.php">Logout</a>
     </div>
 
