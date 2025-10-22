@@ -189,7 +189,7 @@ try {
         
         <?php if (!empty($feedback_message)) echo $feedback_message; ?>
 
-        <form action="generate-paper.php" method="POST" enctype="multipart/form-data">
+        <form action="create-question.php" method="POST" enctype="multipart/form-data">
             <label for="subject_id">1. Select Subject:</label>
             <select name="subject_id" id="subject_id" required>
                 <option value="" disabled selected>-- Choose a Subject --</option>
