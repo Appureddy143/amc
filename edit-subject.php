@@ -184,7 +184,7 @@ try {
             <p>Could not find subject details.</p>
         <?php endif; ?>
 
-        <a href="admin_dashboard.php" class="back-link">Back to Admin Dashboard</a>
+        <a href="admin-panel.php" class="back-link">Back to Admin Dashboard</a>
     </div>
 </body>
 </html>
