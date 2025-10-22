@@ -207,7 +207,7 @@ try {
             <label for="question_bank">3. Upload Question Bank (Excel File):</label>
             <input type="file" id="question_bank" name="question_bank" accept=".xlsx, .xls" required>
             
-            <a href="question_bank_template.xlsx" class="sample-link" download>Download Excel Template (.xlsx)</a>
+            <a href="sample.xlsx" class="sample-link" download>Download Excel Template (.xlsx)</a>
             
             <button type="submit">Upload & Generate Paper</button>
         </form>
