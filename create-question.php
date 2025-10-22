@@ -5,13 +5,24 @@ require 'vendor/autoload.php';
 include('db-config.php'); // Your PDO database connection
 
 use PhpOffice\PhpSpreadsheet\IOFactory;
+use PhpOffice\PhpSpreadsheet\Reader\Exception as ReaderException;
 
 // --- Security Check: Ensure only authorized roles can access ---
-if (!isset($_SESSION['role']) || !in_array($_SESSION['role'], ['staff', 'principal', 'admin', 'hod'])) {
+$allowed_roles = ['staff', 'principal', 'admin', 'hod'];
+if (!isset($_SESSION['role']) || !in_array($_SESSION['role'], $allowed_roles)) {
     // Redirect to login if the role is not allowed
     header("Location: login.php");
     exit;
 }
+
+// Determine the correct dashboard link based on role
+$dashboard_link = match ($_SESSION['role']) {
+    'admin' => 'admin_dashboard.php',
+    'staff' => 'staff_dashboard.php', // Assuming these filenames
+    'hod' => 'hod_dashboard.php',     // Assuming these filenames
+    'principal' => 'principal_dashboard.php', // Assuming these filenames
+    default => 'login.php', // Fallback
+};
 
 // Initialize variables
 $subjects = [];
@@ -19,21 +30,43 @@ $feedback_message = '';
 
 try {
     // --- Fetch subjects for the dropdown menu using PDO ---
-    $stmt = $conn->query("SELECT id, name FROM subjects ORDER BY name");
-    $subjects = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    // Use prepare/execute for consistency, although query() is safe here
+    $stmt_subjects = $conn->prepare("SELECT id, name FROM subjects ORDER BY name");
+    $stmt_subjects->execute();
+    $subjects = $stmt_subjects->fetchAll(PDO::FETCH_ASSOC);
 
     // --- Handle form submission ---
     if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_FILES['question_bank']) && $_FILES['question_bank']['error'] === UPLOAD_ERR_OK) {
+        
+        // Validate required fields
         if (!isset($_POST['subject_id']) || empty($_POST['subject_id']) || !isset($_POST['exam_time']) || empty($_POST['exam_time'])) {
             throw new Exception("Subject and Exam Time are required.");
         }
-
+        
+        // --- File Validation ---
         $file_path = $_FILES['question_bank']['tmp_name'];
+        $file_name = $_FILES['question_bank']['name'];
+        $file_ext = strtolower(pathinfo($file_name, PATHINFO_EXTENSION));
+        $allowed_ext = ['xlsx', 'xls'];
+
+        if (!in_array($file_ext, $allowed_ext)) {
+            throw new Exception("Invalid file type. Please upload an Excel file (.xlsx or .xls).");
+        }
+
+        // --- Get other form data ---
         $subject_id = filter_input(INPUT_POST, 'subject_id', FILTER_VALIDATE_INT);
         $exam_time = filter_input(INPUT_POST, 'exam_time', FILTER_VALIDATE_INT);
         
-        // Load the uploaded spreadsheet
-        $spreadsheet = IOFactory::load($file_path);
+        if (!$subject_id || !$exam_time || $exam_time < 30 || $exam_time > 180) {
+             throw new Exception("Invalid Subject ID or Exam Time provided.");
+        }
+
+        // --- Load and Read Spreadsheet ---
+        try {
+            $spreadsheet = IOFactory::load($file_path);
+        } catch (ReaderException $e) {
+            throw new Exception("Error reading the Excel file. Ensure it's not corrupted and is a valid format.");
+        }
         $sheet = $spreadsheet->getActiveSheet();
         $questions_from_file = [];
         $total_marks_available = 0;
@@ -42,27 +75,31 @@ try {
         foreach ($sheet->getRowIterator(2) as $row) {
             $cells = [];
             foreach ($row->getCellIterator() as $cell) {
-                $cells[] = $cell->getValue();
+                // Read formatted value to handle potential formulas or special types
+                $cells[] = $cell->getFormattedValue(); 
             }
             
-            // Ensure the row has the required columns (Section, Question, Marks)
-            if (count($cells) >= 3 && !empty($cells[1])) {
-                $marks = (int)$cells[2];
-                $questions_from_file[] = [
-                    'section' => trim($cells[0]),
-                    'question' => trim($cells[1]),
-                    'marks' => $marks,
-                ];
-                $total_marks_available += $marks;
+            // Ensure row has Section, Question, Marks & Question is not empty
+            if (count($cells) >= 3 && !empty(trim($cells[1]))) { 
+                $marks_value = filter_var(trim($cells[2]), FILTER_VALIDATE_INT); // Validate marks are integer
+                if ($marks_value !== false && $marks_value > 0) {
+                    $marks = $marks_value;
+                    $questions_from_file[] = [
+                        'section' => trim($cells[0]),
+                        'question' => trim($cells[1]),
+                        'marks' => $marks,
+                    ];
+                    $total_marks_available += $marks;
+                }
             }
         }
         
         if (empty($questions_from_file)) {
-             throw new Exception("The uploaded Excel file is empty or in the wrong format.");
+             throw new Exception("The uploaded Excel file contains no valid questions or is in the wrong format (Expected columns: Section, Question, Marks).");
         }
         
         if ($total_marks_available < 50) {
-            throw new Exception("The question bank does not have enough questions to generate a 50-mark paper.");
+            throw new Exception("The question bank (Total: $total_marks_available marks) does not have enough marks to generate a 50-mark paper.");
         }
 
         // --- Logic to generate a 50-mark question paper ---
@@ -70,27 +107,52 @@ try {
         $total_marks_generated = 0;
         shuffle($questions_from_file); // Randomize questions
 
+        // Simple selection strategy: pick questions until 50 marks are reached or exceeded slightly
         foreach ($questions_from_file as $q) {
             if (($total_marks_generated + $q['marks']) <= 50) {
                 $selected_questions[] = $q;
                 $total_marks_generated += $q['marks'];
+                // Optional: break if exactly 50 is reached and desired
+                // if ($total_marks_generated == 50) break; 
             }
+            // Optional: If you need exactly 50, you might need more complex logic
+            // to swap questions if you slightly overshoot. This simple approach prioritizes
+            // getting close to 50 without complex backtracking.
         }
+        
+        // Check if enough marks were selected (might be slightly less than 50 if question marks don't add up perfectly)
+         if ($total_marks_generated < 40) { // Adjust threshold as needed
+             throw new Exception("Could not generate a paper close enough to 50 marks with the provided questions.");
+         }
+
 
         // --- Save the generated paper to the database ---
-        $staff_id = $_SESSION['user_id'];
-        $title = "QP-" . date('Y-m-d');
+        // Correctly use staff_id from the session
+        $staff_id = $_SESSION['user_id']; 
+        $title = "QP-" . date('Ymd-His'); // More unique title
         $content = json_encode($selected_questions); // Store questions as JSON
 
         $sql = "INSERT INTO question_papers (staff_id, subject_id, title, content, exam_time) VALUES (?, ?, ?, ?, ?)";
         $stmt = $conn->prepare($sql);
-        $stmt->execute([$staff_id, $subject_id, $title, $content, $exam_time]);
+        
+        if ($stmt->execute([$staff_id, $subject_id, $title, $content, $exam_time])) {
+             $feedback_message = "<p class='success-message'>✅ Question Paper (Total Marks: $total_marks_generated) generated and saved successfully!</p>";
+        } else {
+             throw new Exception("Database error: Could not save the question paper.");
+        }
 
-        $feedback_message = "<p class='success-message'>✅ Question Paper (Total Marks: $total_marks_generated) was generated and saved successfully!</p>";
+    } elseif ($_SERVER['REQUEST_METHOD'] == 'POST') {
+        // Handle cases where file upload might have failed before PHP script execution
+        if (isset($_FILES['question_bank']) && $_FILES['question_bank']['error'] !== UPLOAD_ERR_OK) {
+             throw new Exception("File upload failed. Error code: " . $_FILES['question_bank']['error']);
+        }
     }
 
+} catch (PDOException $e) {
+    // Catch database-specific errors
+    $feedback_message = "<p class='error-message'>❌ Database Error: " . htmlspecialchars($e->getMessage()) . "</p>";
 } catch (Exception $e) {
-    // Display any errors that occur
+    // Catch general errors (file reading, validation, etc.)
     $feedback_message = "<p class='error-message'>❌ Error: " . htmlspecialchars($e->getMessage()) . "</p>";
 }
 ?>
@@ -109,17 +171,17 @@ try {
         h2 { text-align: center; }
         form { display: flex; flex-direction: column; gap: 15px; margin-top: 20px; padding: 20px; border: 1px solid #eee; border-radius: 5px; }
         label { font-weight: bold; }
-        input, select, button { width: 100%; padding: 10px; border-radius: 4px; font-size: 16px; box-sizing: border-box; border: 1px solid #ddd; }
-        button { background-color: #007bff; color: white; cursor: pointer; border: none; transition: background-color 0.3s ease; }
+        input[type="number"], input[type="file"], select, button { width: 100%; padding: 10px; border-radius: 4px; font-size: 16px; box-sizing: border-box; border: 1px solid #ddd; }
+        button { background-color: #007bff; color: white; cursor: pointer; border: none; transition: background-color 0.3s ease; font-weight: bold; }
         button:hover { background-color: #0056b3; }
-        a.sample-link { display: block; text-align: center; margin-top: 10px; }
-        .error-message { color: #dc3545; background-color: #f8d7da; border: 1px solid #f5c6cb; padding: 10px; border-radius: 5px; text-align: center; }
-        .success-message { color: #155724; background-color: #d4edda; border: 1px solid #c3e6cb; padding: 10px; border-radius: 5px; text-align: center; }
+        a.sample-link { display: block; text-align: center; margin-top: 10px; color: #007bff; }
+        .error-message { color: #dc3545; background-color: #f8d7da; border: 1px solid #f5c6cb; padding: 10px; border-radius: 5px; text-align: center; margin-bottom: 15px;}
+        .success-message { color: #155724; background-color: #d4edda; border: 1px solid #c3e6cb; padding: 10px; border-radius: 5px; text-align: center; margin-bottom: 15px;}
     </style>
 </head>
 <body>
     <div class="navbar">
-        <a href="admin_dashboard.php">Back to Dashboard</a>
+        <a href="<?= htmlspecialchars($dashboard_link) ?>">Back to Dashboard</a> 
     </div>
 
     <div class="content">
@@ -134,6 +196,9 @@ try {
                 <?php foreach ($subjects as $subject): ?>
                     <option value="<?= $subject['id'] ?>"><?= htmlspecialchars($subject['name']) ?></option>
                 <?php endforeach; ?>
+                 <?php if (empty($subjects)): ?>
+                    <option value="" disabled>No subjects found. Please add subjects first.</option>
+                <?php endif; ?>
             </select>
 
             <label for="exam_time">2. Exam Time (minutes):</label>
@@ -142,7 +207,7 @@ try {
             <label for="question_bank">3. Upload Question Bank (Excel File):</label>
             <input type="file" id="question_bank" name="question_bank" accept=".xlsx, .xls" required>
             
-            <a href="question_bank_template.xlsx" class="sample-link" download>Download Excel Template</a>
+            <a href="question_bank_template.xlsx" class="sample-link" download>Download Excel Template (.xlsx)</a>
             
             <button type="submit">Upload & Generate Paper</button>
         </form>
