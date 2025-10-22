@@ -9,7 +9,6 @@ if (!isset($_SESSION['role']) || $_SESSION['role'] !== 'admin') {
     exit;
 }
 
-// Wrap database operations in a try-catch block for error handling
 try {
     // --- USER MANAGEMENT LOGIC ---
 
@@ -44,13 +43,25 @@ try {
         // Step 1: Remove any allocations of this subject
         $stmt = $conn->prepare("DELETE FROM subject_allocation WHERE subject_id = ?");
         $stmt->execute([$subject_id]);
+        
+        // Step 2: Remove related question papers
+        $stmt_qp = $conn->prepare("DELETE FROM question_papers WHERE subject_id = ?");
+        $stmt_qp->execute([$subject_id]);
 
-        // Step 2: Delete the subject itself
+        // Step 3: Remove related questions
+        $stmt_q = $conn->prepare("DELETE FROM questions WHERE subject_id = ?");
+        $stmt_q->execute([$subject_id]);
+        
+        // Step 4: Remove related timetable entries (handle potential NULL subject_id)
+        $stmt_tt = $conn->prepare("UPDATE timetables SET subject_id = NULL WHERE subject_id = ?");
+        $stmt_tt->execute([$subject_id]);
+
+        // Step 5: Delete the subject itself
         $stmt = $conn->prepare("DELETE FROM subjects WHERE id = ?");
         $stmt->execute([$subject_id]);
-        
+
         $conn->commit();
-        
+
         header("Location: admin_dashboard.php");
         exit;
     }
@@ -98,6 +109,10 @@ try {
     // If any database error occurs, stop the script and show a generic error
     die("Database error: " . $e->getMessage());
 }
+
+// --- Initialize Serial Numbers for display ---
+$current_user_sl_no = $user_start_from + 1;
+$current_subject_sl_no = $subject_start_from + 1;
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -107,32 +122,61 @@ try {
     <title>Admin Dashboard</title>
     <style>
         body { font-family: Arial, sans-serif; margin: 0; padding: 0; background-color: #f4f4f9; color: #333; }
-        .navbar { background-color: #007bff; padding: 1em; display: flex; justify-content: flex-end; gap: 1em; }
-        .navbar a { color: #fff; text-decoration: none; padding: 0.5em 1em; border-radius: 5px; transition: background-color 0.3s ease; }
+        .navbar { background-color: #007bff; padding: 1em; display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 1em; } /* Added flex-wrap */
+        .navbar a { color: #fff; text-decoration: none; padding: 0.5em 1em; border-radius: 5px; transition: background-color 0.3s ease; white-space: nowrap; } /* Added nowrap */
         .navbar a:hover { background-color: #0056b3; }
         .container { width: 90%; max-width: 1200px; margin: 20px auto; background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
         h2 { color: #444; border-bottom: 2px solid #eee; padding-bottom: 10px; margin-top: 20px; }
-        table { width: 100%; border-collapse: collapse; margin-top: 1em; }
+        table { width: 100%; border-collapse: collapse; margin-top: 1em; table-layout: fixed; /* Helps with consistent column width */ word-wrap: break-word; /* Prevents long text overflow */ }
         th, td { border: 1px solid #ddd; padding: 0.75em; text-align: left; }
         th { background-color: #007bff; color: #fff; }
-        .pagination { margin: 1em 0; text-align: center; }
-        .pagination a { margin: 0 5px; text-decoration: none; padding: 5px 10px; border: 1px solid #007bff; border-radius: 5px; color: #007bff; }
-        .pagination a.active { background-color: #007bff; color: #fff; }
-        .pagination a:hover { background-color: #0056b3; color: #fff; }
-        .action-btn { text-decoration: none; padding: 5px 10px; border-radius: 5px; font-size: 14px; color: white; margin-right: 5px; display: inline-block; }
+        .pagination { margin: 1em 0; text-align: center; padding: 10px 0; }
+        .pagination a { margin: 0 3px; text-decoration: none; padding: 5px 10px; border: 1px solid #007bff; border-radius: 5px; color: #007bff; transition: background-color 0.3s, color 0.3s; }
+        .pagination a.active { background-color: #007bff; color: #fff; border-color: #007bff; }
+        .pagination a:hover:not(.active) { background-color: #e9ecef; color: #0056b3; } /* Subtle hover */
+        .action-btn { text-decoration: none; padding: 5px 10px; border-radius: 5px; font-size: 14px; color: white; margin-right: 5px; display: inline-block; transition: opacity 0.3s; }
+        .action-btn:hover { opacity: 0.8; }
         .edit-btn { background-color: #28a745; }
         .remove-btn { background-color: #dc3545; }
+        td { vertical-align: middle; } /* Align content vertically */
+        /* Responsive Table */
+        @media screen and (max-width: 768px) {
+            table, thead, tbody, th, td, tr { display: block; }
+            thead tr { position: absolute; top: -9999px; left: -9999px; }
+            tr { border: 1px solid #ccc; margin-bottom: 5px; }
+            td { border: none; border-bottom: 1px solid #eee; position: relative; padding-left: 50%; white-space: normal; text-align:right; }
+            td:before { position: absolute; top: 6px; left: 6px; width: 45%; padding-right: 10px; white-space: nowrap; text-align:left; font-weight: bold; }
+            /* Label the data */
+            td:nth-of-type(1):before { content: "Sl. No."; }
+            td:nth-of-type(2):before { content: "Name"; }
+            td:nth-of-type(3):before { content: "Branch"; }
+            td:nth-of-type(4):before { content: "Email"; }
+            td:nth-of-type(5):before { content: "Joining Date"; }
+            td:nth-of-type(6):before { content: "Role"; }
+            td:nth-of-type(7):before { content: "Actions"; }
+            
+            /* Subject Table Specific Labels */
+            .subject-table td:nth-of-type(1):before { content: "Sl. No."; }
+            .subject-table td:nth-of-type(2):before { content: "Subject Name"; }
+            .subject-table td:nth-of-type(3):before { content: "Subject Code"; }
+            .subject-table td:nth-of-type(4):before { content: "Branch"; }
+            .subject-table td:nth-of-type(5):before { content: "Semester"; }
+            .subject-table td:nth-of-type(6):before { content: "Year"; }
+            .subject-table td:nth-of-type(7):before { content: "Actions"; }
+
+            .pagination a { padding: 8px 12px; } /* Slightly larger touch targets */
+        }
     </style>
 </head>
 <body>
     <div class="navbar">
-        <a href="logout.php">Logout</a>
-        <a href="add-staff.php">Add Staff </a>
+        <a href="add-staff.php">Add Staff</a>
         <a href="add-student.php">Add Student</a>
-        <a href="view-students.php">View Student</a>
+        <a href="view-students.php">View Students</a>
         <a href="add-subject.php">Add Subjects</a>
-        <a href="subject-allocation.php">Allocate Subjects</a>
-        <a href="create-timetable.php">Create Timetables</a>
+        <a href="bulk-upload.php">Bulk Upload</a>
+        <a href="generate-paper.php">Generate Paper</a>
+        <a href="logout.php">Logout</a>
     </div>
 
     <div class="container">
@@ -143,7 +187,7 @@ try {
         <table>
             <thead>
                 <tr>
-                    <th>ID</th>
+                    <th>Sl. No.</th>
                     <th>Name</th>
                     <th>Branch</th>
                     <th>Email</th>
@@ -155,7 +199,7 @@ try {
             <tbody>
                 <?php foreach ($users as $user): ?>
                     <tr>
-                        <td><?= htmlspecialchars($user['id']) ?></td>
+                        <td><?= $current_user_sl_no ?></td>
                         <td><?= htmlspecialchars($user['first_name'] . ' ' . $user['surname']) ?></td>
                         <td><?= htmlspecialchars($user['branch'] ?? 'N/A') ?></td>
                         <td><?= htmlspecialchars($user['email']) ?></td>
@@ -166,6 +210,7 @@ try {
                             <a href="?delete_user=<?= $user['id'] ?>" class="action-btn remove-btn" onclick="return confirm('Are you sure you want to delete this user? This cannot be undone.')">Remove</a>
                         </td>
                     </tr>
+                <?php $current_user_sl_no++; ?>
                 <?php endforeach; ?>
                 <?php if (empty($users)): ?>
                     <tr>
@@ -175,9 +220,10 @@ try {
             </tbody>
         </table>
 
+        <!-- User Pagination -->
         <div class="pagination">
             <?php for ($i = 1; $i <= $total_user_pages; $i++): ?>
-                <a href="?user_page=<?= $i ?>" <?= $i === $user_page ? 'class="active"' : '' ?>><?= $i ?></a>
+                <a href="?user_page=<?= $i ?>&subject_page=<?= $subject_page /* Preserve subject page */ ?>" <?= $i === $user_page ? 'class="active"' : '' ?>><?= $i ?></a>
             <?php endfor; ?>
         </div>
 
@@ -185,10 +231,10 @@ try {
 
         <!-- Subjects Section -->
         <h2>All Subjects</h2>
-        <table>
+        <table class="subject-table"> <!-- Added class for responsive CSS targeting -->
             <thead>
                 <tr>
-                    <th>ID</th>
+                    <th>Sl. No.</th>
                     <th>Subject Name</th>
                     <th>Subject Code</th>
                     <th>Branch</th>
@@ -200,7 +246,7 @@ try {
             <tbody>
                 <?php foreach ($subjects as $subject): ?>
                     <tr>
-                        <td><?= htmlspecialchars($subject['id']) ?></td>
+                        <td><?= $current_subject_sl_no ?></td>
                         <td><?= htmlspecialchars($subject['name']) ?></td>
                         <td><?= htmlspecialchars($subject['subject_code']) ?></td>
                         <td><?= htmlspecialchars($subject['branch']) ?></td>
@@ -211,6 +257,7 @@ try {
                             <a href="?delete_subject=<?= $subject['id'] ?>" class="action-btn remove-btn" onclick="return confirm('Are you sure you want to delete this subject? This cannot be undone.')">Remove</a>
                         </td>
                     </tr>
+                <?php $current_subject_sl_no++; ?>
                 <?php endforeach; ?>
                 <?php if (empty($subjects)): ?>
                     <tr>
@@ -220,9 +267,10 @@ try {
             </tbody>
         </table>
 
+        <!-- Subject Pagination -->
         <div class="pagination">
             <?php for ($i = 1; $i <= $total_subject_pages; $i++): ?>
-                <a href="?subject_page=<?= $i ?>" <?= $i === $subject_page ? 'class="active"' : '' ?>><?= $i ?></a>
+                <a href="?subject_page=<?= $i ?>&user_page=<?= $user_page /* Preserve user page */ ?>" <?= $i === $subject_page ? 'class="active"' : '' ?>><?= $i ?></a>
             <?php endfor; ?>
         </div>
     </div>
