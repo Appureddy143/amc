@@ -1,5 +1,5 @@
 <?php
-session_start();
+session_start(); // Start session if needed later
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -7,7 +7,7 @@ session_start();
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Student Corner</title>
-    <link rel="stylesheet" href="styles.css">
+    <!-- <link rel="stylesheet" href="styles.css"> No separate CSS needed -->
     <script>
         // Toggle Navbar visibility
         function toggleNavbar() {
@@ -17,190 +17,205 @@ session_start();
     </script>
     <style>
         /* General Reset */
-* {
-    margin: 0;
-    padding: 0;
-    box-sizing: border-box;
-}
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
 
-body {
-    font-family: 'Arial', sans-serif;
-    color: #333;
-    line-height: 1.6;
-    background: #f4f4f9;
-    overflow-x: hidden;
-}
+        body {
+            font-family: 'Arial', sans-serif;
+            color: #333;
+            line-height: 1.6;
+            background: #f4f4f9;
+            overflow-x: hidden;
+        }
 
-/* Header Section */
-.header {
-    background: #007BFF;
-    color: white;
-    padding: 15px 20px;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    position: sticky;
-    top: 0;
-    z-index: 1000;
-}
+        /* Header Section */
+        .header {
+            background: #007BFF;
+            color: white;
+            padding: 15px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+        }
 
-.header .container {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    width: 100%;
-}
+        .header .container {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            width: 100%;
+        }
 
-.header-left h1 {
-    font-size: 1.8rem;
-    font-weight: bold;
-}
+        .header-left h1 {
+            font-size: 1.8rem;
+            font-weight: bold;
+            margin: 0; /* Remove default margin */
+        }
 
-.header-right {
-    display: flex;
-    align-items: center;
-    position: relative;
-}
+        .header-right {
+            display: flex;
+            align-items: center;
+            position: relative;
+        }
 
-.hamburger {
-    display: none;
-    cursor: pointer;
-    flex-direction: column;
-    gap: 5px;
-}
+        .hamburger {
+            display: none;
+            cursor: pointer;
+            flex-direction: column;
+            gap: 5px;
+        }
 
-.hamburger .line {
-    width: 25px;
-    height: 3px;
-    background-color: white;
-    border-radius: 2px;
-}
+        .hamburger .line {
+            width: 25px;
+            height: 3px;
+            background-color: white;
+            border-radius: 2px;
+        }
 
-.nav-links {
-    display: flex;
-    list-style: none;
-    gap: 20px;
-}
+        .nav-links {
+            display: flex;
+            list-style: none;
+            gap: 20px;
+            margin: 0; /* Remove default margin */
+        }
 
-.nav-links a {
-    color: white;
-    text-decoration: none;
-    font-size: 1rem;
-    padding: 8px 15px;
-    transition: background-color 0.3s ease;
-}
+        .nav-links a {
+            color: white;
+            text-decoration: none;
+            font-size: 1rem;
+            padding: 8px 15px;
+            transition: background-color 0.3s ease;
+            border-radius: 5px;
+        }
 
-.nav-links a:hover {
-    background-color: #0056b3;
-    border-radius: 5px;
-}
+        .nav-links a:hover {
+            background-color: #0056b3;
+        }
 
-/* Responsive Navbar */
-@media (max-width: 768px) {
-    .hamburger {
-        display: flex;
-    }
+        /* Responsive Navbar */
+        @media (max-width: 768px) {
+            .hamburger {
+                display: flex;
+            }
 
-    .nav-links {
-        display: none;
-        flex-direction: column;
-        background: #0056b3;
-        position: absolute;
-        top: 50px;
-        right: 10px;
-        width: 200px;
-        border-radius: 8px;
-        box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.2);
-    }
+            .nav-links {
+                display: none;
+                flex-direction: column;
+                background: #0056b3; /* Slightly darker for dropdown */
+                position: absolute;
+                top: 60px; /* Adjust based on header height */
+                right: 10px;
+                width: 200px;
+                border-radius: 8px;
+                box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.2);
+                padding: 10px 0; /* Add padding */
+            }
 
-    .nav-links.active {
-        display: flex;
-    }
+            .nav-links.active {
+                display: flex;
+            }
 
-    .nav-links li {
-        text-align: center;
-        margin: 10px 0;
-    }
-}
+            .nav-links li {
+                text-align: center;
+                margin: 0; /* Remove default margin */
+                width: 100%;
+            }
+             .nav-links a {
+                 display: block; /* Make links full width */
+                 padding: 10px 0;
+             }
+             .nav-links a:hover {
+                 background-color: #004494; /* Darker hover for dropdown */
+             }
+        }
 
-/* Main Content */
-.main-content {
-    padding: 40px 20px;
-    text-align: center;
-    background: #f4f4f9;
-}
+        /* Main Content */
+        .main-content {
+            padding: 40px 20px;
+            text-align: center;
+            background: #f4f4f9;
+        }
 
-.welcome {
-    margin-bottom: 40px;
-}
+        .welcome {
+            margin-bottom: 40px;
+        }
 
-.welcome h2 {
-    font-size: 2.5rem;
-    margin-bottom: 15px;
-}
+        .welcome h2 {
+            font-size: 2.5rem;
+            margin-bottom: 15px;
+             color: #333; /* Make welcome text dark */
+        }
 
-.welcome p {
-    font-size: 1.2rem;
-    color: #555;
-}
+        .welcome p {
+            font-size: 1.2rem;
+            color: #555;
+        }
 
-.features {
-    display: flex;
-    justify-content: center;
-    gap: 20px;
-    flex-wrap: wrap;
-}
+        .features {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
 
-.feature-card {
-    background: white;
-    border-radius: 8px;
-    box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.1);
-    padding: 20px;
-    width: 300px;
-    text-align: center;
-}
+        .feature-card {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.1);
+            padding: 20px;
+            width: 300px;
+            text-align: center;
+        }
 
-.feature-card h3 {
-    font-size: 1.5rem;
-    margin-bottom: 10px;
-}
+        .feature-card h3 {
+            font-size: 1.5rem;
+            margin-bottom: 10px;
+            color: #007BFF; /* Blue headings for cards */
+        }
 
-.feature-card p {
-    font-size: 1rem;
-    margin-bottom: 20px;
-    color: #666;
-}
+        .feature-card p {
+            font-size: 1rem;
+            margin-bottom: 20px;
+            color: #666;
+        }
 
-.feature-card .button {
-    background-color: #007BFF;
-    color: white;
-    padding: 10px 15px;
-    text-decoration: none;
-    border-radius: 5px;
-    transition: background-color 0.3s ease;
-}
+        .feature-card .button {
+            background-color: #007BFF;
+            color: white;
+            padding: 10px 15px;
+            text-decoration: none;
+            border-radius: 5px;
+            transition: background-color 0.3s ease;
+            display: inline-block; /* Ensure button padding works */
+        }
 
-.feature-card .button:hover {
-    background-color: #0056b3;
-}
+        .feature-card .button:hover {
+            background-color: #0056b3;
+        }
 
-/* Responsive Layout */
-@media (max-width: 768px) {
-    .welcome h2 {
-        font-size: 2rem;
-    }
+        /* Responsive Layout */
+        @media (max-width: 768px) {
+            .welcome h2 {
+                font-size: 2rem;
+            }
 
-    .features {
-        flex-direction: column;
-        gap: 20px;
-    }
+            .features {
+                flex-direction: column;
+                align-items: center; /* Center cards vertically */
+                gap: 20px;
+            }
 
-    .feature-card {
-        width: 90%;
-    }
-}
-
-        </style>
+            .feature-card {
+                width: 90%;
+                max-width: 400px; /* Limit card width on mobile */
+            }
+        }
+    </style>
 </head>
 <body>
     <!-- Header Section -->
@@ -219,8 +234,8 @@ body {
                     <li><a href="#ia-time-tables">IA Time Tables</a></li>
                     <li><a href="#class-time-tables">Class Time Tables</a></li>
                     <li><a href="#events-calendar">Calendar of Events</a></li>
-                    <li><a href="index.php">Back to Home</a></li>
-                    <li><a href="student-login.php">Login</a></li>
+                    <li><a href="/">Back to Home</a></li>
+                    <li><a href="/student-login">Login</a></li>
                 </ul>
             </div>
         </div>
