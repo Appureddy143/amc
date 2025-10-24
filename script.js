@@ -1,3 +1,4 @@
+
 require('fpdf.php');
 
 class PDF extends FPDF {
@@ -19,5 +20,6 @@ if ($row = $result->fetch_assoc()) {
     $pdf->Cell(0, 10, $row['title'], 0, 1);
     $pdf->MultiCell(0, 10, $row['content']);
 }
+
 
 $pdf->Output('D', 'question_paper.pdf');
