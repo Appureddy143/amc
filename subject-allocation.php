@@ -1,73 +1,90 @@
-<?php
-// session_start(); // Enable this line if you implement sessions later
-require_once('db.php'); // Use the correct database connection file (PDO)
+here<?php
+session_start();
+// 1. Include the correct PDO database connection
+include('db-config.php'); 
 
-// --- Security Check (Placeholder) ---
-// Uncomment and adapt this section when you have a login system
-/*
+// Ensure only admins can access
 if (!isset($_SESSION['role']) || $_SESSION['role'] !== 'admin') {
-    header("Location: login.php"); // Redirect to your login page
+    header("Location: login.php");
     exit;
 }
-*/
 
-// --- Handle Subject Allocation ---
-if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['allocate_subjects'])) {
-    // Basic validation
-    if (empty($_POST['staff_id']) || empty($_POST['subject_ids']) || !is_array($_POST['subject_ids'])) {
-        $error = "Please select a staff member and at least one subject.";
-    } else {
+$message = ""; // To store feedback messages
+$message_type = "error"; // Default message type
+$staff_members = [];
+$available_subjects = [];
+
+try {
+    // --- Handle subject allocation on POST request ---
+    if ($_SERVER["REQUEST_METHOD"] == "POST") {
         $staff_id = filter_input(INPUT_POST, 'staff_id', FILTER_VALIDATE_INT);
-        $subject_ids = filter_input(INPUT_POST, 'subject_ids', FILTER_VALIDATE_INT, FILTER_REQUIRE_ARRAY);
+        // Ensure subject_ids is treated as an array, even if only one is selected
+        $subject_ids = isset($_POST['subject_ids']) ? (array)$_POST['subject_ids'] : []; 
 
-        if ($staff_id === false || $subject_ids === false || in_array(false, $subject_ids, true)) {
-             $error = "Invalid input data.";
+        if (!$staff_id || empty($subject_ids)) {
+            $message = "Please select a staff member and at least one subject.";
         } else {
-            // Prepare the statement for inserting allocations (PostgreSQL compatible)
-            // ON CONFLICT DO NOTHING prevents duplicates
-            $sql = "INSERT INTO subject_allocation (staff_id, subject_id) VALUES (:staff_id, :subject_id) ON CONFLICT (staff_id, subject_id) DO NOTHING";
-            $stmt = $pdo->prepare($sql);
+            $conn->beginTransaction(); // Start transaction for atomic insertion
+
+            // Prepare statement for checking existing allocation
+            $check_sql = "SELECT COUNT(*) FROM subject_allocation WHERE staff_id = ? AND subject_id = ?";
+            $check_stmt = $conn->prepare($check_sql);
+
+            // Prepare statement for inserting new allocation
+            $insert_sql = "INSERT INTO subject_allocation (staff_id, subject_id) VALUES (?, ?)";
+            $insert_stmt = $conn->prepare($insert_sql);
 
             $allocated_count = 0;
-            foreach ($subject_ids as $subject_id) {
-                // Ensure subject_id is a valid integer before binding
-                 if ($subject_id > 0) {
-                     $stmt->bindParam(':staff_id', $staff_id, PDO::PARAM_INT);
-                     $stmt->bindParam(':subject_id', $subject_id, PDO::PARAM_INT);
-                     $stmt->execute();
-                     if ($stmt->rowCount() > 0) {
-                         $allocated_count++;
-                     }
-                 }
+            $skipped_count = 0;
+
+            foreach ($subject_ids as $subject_id_raw) {
+                $subject_id = filter_var($subject_id_raw, FILTER_VALIDATE_INT);
+                if ($subject_id === false) continue; // Skip invalid subject IDs
+
+                // Check if this allocation already exists
+                $check_stmt->execute([$staff_id, $subject_id]);
+                if ($check_stmt->fetchColumn() == 0) {
+                    // Allocation doesn't exist, insert it
+                    if ($insert_stmt->execute([$staff_id, $subject_id])) {
+                        $allocated_count++;
+                    } else {
+                        // If one insertion fails, roll back the entire transaction
+                        throw new PDOException("Failed to allocate subject ID: $subject_id");
+                    }
+                } else {
+                    $skipped_count++; // Allocation already exists
+                }
             }
-             $message = $allocated_count . " subject(s) allocated successfully!";
+
+            $conn->commit(); // Commit transaction if all insertions were successful
+
+            $message = "Successfully allocated $allocated_count subject(s).";
+            if ($skipped_count > 0) {
+                $message .= " Skipped $skipped_count already allocated subject(s).";
+            }
+            $message_type = "success";
         }
     }
-}
 
-// --- Fetch Data for Dropdowns ---
-try {
-    // Fetch staff members
-    $staff_stmt = $pdo->query("SELECT id, first_name, surname FROM users WHERE role = 'staff' ORDER BY first_name");
+    // --- Fetch staff members for the dropdown ---
+    $staff_stmt = $conn->prepare("SELECT id, first_name, surname FROM users WHERE role = 'staff' ORDER BY first_name, surname");
+    $staff_stmt->execute();
     $staff_members = $staff_stmt->fetchAll(PDO::FETCH_ASSOC);
 
-    // Fetch subjects not yet allocated to *any* staff member
-    $subject_stmt = $pdo->query("
-        SELECT s.id, s.name AS subject_name, s.subject_code
-        FROM subjects s
-        LEFT JOIN subject_allocation sa ON s.id = sa.subject_id
-        WHERE sa.subject_id IS NULL
-        ORDER BY s.subject_code
-    ");
-    $subjects = $subject_stmt->fetchAll(PDO::FETCH_ASSOC);
-
-    // Fetch *all* subjects for potential re-allocation viewing (optional)
-    // $all_subjects_stmt = $pdo->query("SELECT id, name AS subject_name, subject_code FROM subjects ORDER BY subject_code");
-    // $all_subjects = $all_subjects_stmt->fetchAll(PDO::FETCH_ASSOC);
+    // --- Fetch subjects for the multi-select ---
+    // Show all subjects, let the admin decide which ones to allocate
+    $subject_stmt = $conn->prepare("SELECT id, name AS subject_name, subject_code FROM subjects ORDER BY name");
+    $subject_stmt->execute();
+    $available_subjects = $subject_stmt->fetchAll(PDO::FETCH_ASSOC);
 
 } catch (PDOException $e) {
-    // In a real application, log this error instead of dying
-    die("Error fetching data: " . $e->getMessage());
+    if ($conn->inTransaction()) {
+        $conn->rollBack(); // Roll back transaction on error
+    }
+    $message = "Database Error: " . $e->getMessage();
+    $message_type = "error";
+    // For production, use a generic error:
+    // $message = "An error occurred during subject allocation. Please try again.";
 }
 ?>
 
@@ -78,40 +95,41 @@ try {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Subject Allocation</title>
     <style>
-        /* Reusing styles from admin.php for consistency */
-        :root { --space-cadet: #2b2d42; --cool-gray: #8d99ae; --antiflash-white: #edf2f4; --red-pantone: #ef233c; --fire-engine-red: #d90429; }
-        body { font-family: 'Segoe UI', sans-serif; margin: 0; padding: 20px; background: var(--space-cadet); color: var(--antiflash-white); }
-        .back-link { display: block; max-width: 860px; margin: 0 auto 20px auto; text-align: right; font-weight: bold; color: var(--antiflash-white); text-decoration: none; }
-        .back-link:hover { text-decoration: underline; }
-        .container { max-width: 800px; margin: 20px auto; padding: 30px; background: rgba(141, 153, 174, 0.1); border-radius: 15px; border: 1px solid rgba(141, 153, 174, 0.2); }
-        h1, h2 { text-align: center; }
-        form { display: flex; flex-direction: column; gap: 1em; }
-        label { display: block; margin-bottom: 5px; font-weight: 600; }
-        select { width: 100%; padding: 10px; margin-bottom: 5px; border-radius: 5px; border: 1px solid var(--cool-gray); background: rgba(43, 45, 66, 0.5); color: var(--antiflash-white); box-sizing: border-box; }
-        select[multiple] { height: 150px; } /* Make multiple select taller */
-        button { padding: 12px 20px; border: none; border-radius: 5px; background-color: var(--fire-engine-red); color: var(--antiflash-white); font-weight: bold; cursor: pointer; width: 100%; font-size: 1.1em; }
-        button:hover { background-color: var(--red-pantone); }
-        .message { padding: 10px; border-radius: 5px; margin-bottom: 1em; text-align: center; font-weight: bold; }
-        .success { background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
-        .error { background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
-        .info { font-size: 0.9em; color: var(--cool-gray); }
+        body { font-family: Arial, sans-serif; margin: 0; padding: 0; background-color: #f4f4f9; color: #333; }
+        .navbar { background-color: #007bff; padding: 1em; display: flex; justify-content: flex-end; gap: 1em; }
+        .navbar a { color: #fff; text-decoration: none; padding: 0.5em 1em; border-radius: 5px; transition: background-color 0.3s ease; }
+        .navbar a:hover { background-color: #0056b3; }
+        .content { padding: 2em; margin: 1em auto; max-width: 800px; background-color: #fff; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+        h2 { text-align: center; margin-bottom: 1.5em; color: #444;}
+        form { display: flex; flex-direction: column; gap: 1.2em; }
+        form label { font-weight: bold; color: #555; }
+        form select { padding: 0.75em; border: 1px solid #ddd; border-radius: 5px; font-size: 1em; }
+        form select[multiple] { height: 150px; /* Make multiple select taller */ }
+        form p { font-size: 0.9em; color: #777; margin-top: -0.5em; }
+        form button { background-color: #28a745; color: #fff; border: none; padding: 0.75em 1.5em; border-radius: 5px; cursor: pointer; font-size: 1em; font-weight: bold; transition: background-color 0.3s ease; }
+        form button:hover { background-color: #218838; }
+        .message { padding: 15px; margin-bottom: 20px; border-radius: 5px; width: 100%; box-sizing: border-box; text-align: center; font-size: 16px; }
+        .message.success { background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .message.error { background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
     </style>
 </head>
 <body>
-    <a href="/admin" class="back-link">&laquo; Back to Admin Dashboard</a>
+    <div class="navbar">
+        <a href="admin_dashboard.php">Back to Admin Dashboard</a>
+    </div>
 
-    <div class="container">
+    <div class="content">
         <h2>Allocate Subjects to Staff</h2>
 
-        <?php if (isset($message)): ?>
-            <div class="message success"><?= htmlspecialchars($message) ?></div>
-        <?php endif; ?>
-        <?php if (isset($error)): ?>
-            <div class="message error"><?= htmlspecialchars($error) ?></div>
-        <?php endif; ?>
+        <?php 
+        // Display feedback message if set
+        if (!empty($message)) {
+            echo "<div class='message " . htmlspecialchars($message_type) . "'>" . htmlspecialchars($message) . "</div>";
+        } 
+        ?>
 
         <form action="subject-allocation.php" method="POST">
-            <label for="staff_id">Select Staff:</label>
+            <label for="staff_id">Select Staff Member:</label>
             <select name="staff_id" id="staff_id" required>
                 <option value="">-- Select Staff --</option>
                 <?php foreach ($staff_members as $staff): ?>
@@ -119,23 +137,25 @@ try {
                         <?= htmlspecialchars($staff['first_name'] . ' ' . $staff['surname']) ?>
                     </option>
                 <?php endforeach; ?>
-            </select>
-            
-            <label for="subject_ids">Select Subjects (Only Unallocated Shown):</label>
-            <select name="subject_ids[]" id="subject_ids" multiple required>
-                <?php if (empty($subjects)): ?>
-                    <option value="" disabled>No unallocated subjects found.</option>
-                <?php else: ?>
-                    <?php foreach ($subjects as $subject): ?>
-                        <option value="<?= htmlspecialchars($subject['id']) ?>">
-                            <?= htmlspecialchars($subject['subject_code'] . ' - ' . $subject['subject_name']) ?>
-                        </option>
-                    <?php endforeach; ?>
+                <?php if(empty($staff_members)): ?>
+                     <option value="" disabled>No staff members found.</option>
                 <?php endif; ?>
             </select>
-            <p class="info">Hold Ctrl (or Cmd on Mac) to select multiple subjects.</p>
+            
+            <label for="subject_ids">Select Subjects to Allocate:</label>
+            <select name="subject_ids[]" id="subject_ids" multiple required>
+                 <?php foreach ($available_subjects as $subject): ?>
+                    <option value="<?= htmlspecialchars($subject['id']) ?>">
+                        <?= htmlspecialchars($subject['subject_code'] . ' - ' . $subject['subject_name']) ?>
+                    </option>
+                <?php endforeach; ?>
+                 <?php if(empty($available_subjects)): ?>
+                     <option value="" disabled>No subjects available to allocate.</option>
+                <?php endif; ?>
+            </select>
+            <p>Hold Ctrl (or Cmd on Mac) to select multiple subjects.</p>
 
-            <button type="submit" name="allocate_subjects">Allocate Subjects</button>
+            <button type="submit">Allocate Selected Subjects</button>
         </form>
     </div>
 </body>
