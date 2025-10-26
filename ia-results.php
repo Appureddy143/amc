@@ -1,11 +1,12 @@
 <?php
 session_start();
-// Use ../ to go up one directory to find the db-config.php file
-include('../db-config.php'); 
+// 1. Correct the include path - assuming ia-results.php is in the root
+include('db-config.php'); 
 
 // Check if a student is logged in
 if (!isset($_SESSION['student_id'])) {
-    header("Location: student-login.php");
+    // Redirect to the correct student login page (adjust path if needed)
+    header("Location: student/student-login.php"); 
     exit;
 }
 
@@ -115,7 +116,8 @@ try {
                 <?php endif; ?>
             </tbody>
         </table>
-        <a href="student-dashboard.php" class="back-link">Back to Dashboard</a>
+        <!-- Adjust path if student dashboard is elsewhere -->
+        <a href="student/student-dashboard.php" class="back-link">Back to Dashboard</a> 
     </div>
 </body>
 </html>
