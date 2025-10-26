@@ -244,8 +244,8 @@ try {
             <input type="file" id="question_bank" name="question_bank" accept=".xlsx, .xls" required>
 
             <div class="template-links">
-                 <a href="descriptive_question_template.xlsx" download>Download Descriptive Template (.xlsx)</a>
-                 <a href="mcq_question_template.xlsx" download>Download MCQ Template (.xlsx)</a>
+                 <a href="sample.xlsx" download>Download Descriptive Template (.xlsx)</a>
+                 <a href="mcq-sample.xlsx" download>Download MCQ Template (.xlsx)</a>
             </div>
 
             <button type="submit">Upload & Generate Paper</button>
