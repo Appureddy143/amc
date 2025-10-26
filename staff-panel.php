@@ -1,7 +1,7 @@
 <?php
 session_start();
 // 1. Include the correct PDO database connection
-include('db-config.php'); 
+include('db-config.php');
 
 // Ensure only staff members can access
 if (!isset($_SESSION['role']) || $_SESSION['role'] !== 'staff') {
@@ -22,17 +22,17 @@ $question_papers = []; // Initialize array for papers
 try {
     // 2. Prepare the query to fetch question papers created BY THIS staff member
     // We join with the subjects table to get the subject name/code if needed later
-    $sql = "SELECT qp.id, qp.title, s.subject_code, s.name as subject_name 
+    $sql = "SELECT qp.id, qp.title, s.subject_code, s.name as subject_name
             FROM question_papers qp
-            JOIN subjects s ON qp.subject_id = s.id 
-            WHERE qp.staff_id = ? 
+            JOIN subjects s ON qp.subject_id = s.id
+            WHERE qp.staff_id = ?
             ORDER BY qp.created_at DESC";
-            
+
     $stmt = $conn->prepare($sql);
-    
+
     // 3. Execute the query with the staff_id
     $stmt->execute([$staff_id]);
-    
+
     // 4. Fetch all results
     $question_papers = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
@@ -59,14 +59,14 @@ try {
         table { width: 100%; border-collapse: collapse; margin-top: 1em; }
         th, td { border: 1px solid #ddd; padding: 0.75em; text-align: left; }
         th { background-color: #007bff; color: #fff; }
-        .action-btn { 
-            text-decoration: none; 
-            padding: 5px 10px; 
-            border-radius: 5px; 
-            font-size: 14px; 
-            color: white; 
-            margin-right: 5px; 
-            display: inline-block; 
+        .action-btn {
+            text-decoration: none;
+            padding: 5px 10px;
+            border-radius: 5px;
+            font-size: 14px;
+            color: white;
+            margin-right: 5px;
+            display: inline-block;
             transition: opacity 0.3s;
         }
         .action-btn:hover { opacity: 0.8; }
@@ -91,10 +91,12 @@ try {
 <body>
     <div class="navbar">
         <a href="generate-paper.php">Create Question Paper</a>
-        <!-- Add links relevant for staff -->
+        <a href="assign-test.php">Assign Test</a>
+        <a href="correct-test.php">Correct Tests</a>
+        <!-- Add links relevant for staff as features are built -->
         <!-- <a href="view-timetable.php">View Timetables</a> -->
-        <!-- <a href="enter-attendance.php">Enter Attendance</a> -->
-        <!-- <a href="enter-results.php">Enter IA Marks</a> -->
+        <a href="enter-attendance.php">Enter Attendance</a>
+        <a href="enter-results.php">Enter IA Marks</a>
         <a href="logout.php">Logout</a>
     </div>
 
@@ -123,8 +125,8 @@ try {
                             <td><?= htmlspecialchars($paper['subject_name'] . ' (' . $paper['subject_code'] . ')') ?></td>
                             <td>
                                 <!-- TODO: Create these pages -->
-                                <a href="view-paper.php?id=<?= $paper['id'] ?>" class="action-btn view-btn">View</a> 
-                                <a href="edit-paper.php?id=<?= $paper['id'] ?>" class="action-btn edit-btn">Edit</a> 
+                                <a href="view-paper.php?id=<?= $paper['id'] ?>" class="action-btn view-btn">View</a>
+                                <a href="edit-paper.php?id=<?= $paper['id'] ?>" class="action-btn edit-btn">Edit</a>
                                 <a href="delete-paper.php?id=<?= $paper['id'] ?>" class="action-btn delete-btn" onclick="return confirm('Are you sure you want to delete this paper?')">Delete</a>
                             </td>
                         </tr>
@@ -136,3 +138,4 @@ try {
 
 </body>
 </html>
+
