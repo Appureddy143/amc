@@ -67,7 +67,8 @@ try {
     }
 
     // --- Fetch staff members for the dropdown ---
-    $staff_stmt = $conn->prepare("SELECT id, first_name, surname FROM users WHERE role IN ('staff', 'hod', 'principal') ORDER BY first_name, surname"); // Include HOD/Principal?
+    // Corrected Case for Enum values 'HOD' and 'principal'
+    $staff_stmt = $conn->prepare("SELECT id, first_name, surname FROM users WHERE role IN ('staff', 'HOD', 'principal') ORDER BY first_name, surname"); 
     $staff_stmt->execute();
     $staff_members = $staff_stmt->fetchAll(PDO::FETCH_ASSOC);
 
@@ -81,10 +82,11 @@ try {
     if ($conn->inTransaction()) {
         $conn->rollBack(); // Roll back transaction on error
     }
-    $message = "Database Error: " . $e->getMessage();
+    // Provide specific error info during development, generic in production
+    $message = "Database Error: " . $e->getMessage() . " (Code: " . $e->getCode() . ")";
+    // $message = "An error occurred during subject allocation. Please try again."; // Production message
     $message_type = "error";
-    // For production, use a generic error:
-    // $message = "An error occurred during subject allocation. Please try again.";
+    
 }
 ?>
 
@@ -163,3 +165,4 @@ try {
     </div>
 </body>
 </html>
+
