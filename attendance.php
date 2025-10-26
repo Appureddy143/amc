@@ -1,11 +1,12 @@
 <?php
 session_start();
-// Use ../ to go up one directory to find the db-config.php file
-include('../db-config.php'); 
+// 1. Include db-config.php directly (assuming attendance.php is in the root)
+include('db-config.php'); 
 
 // Check if a student is logged in
 if (!isset($_SESSION['student_id'])) {
-    header("Location: student-login.php");
+    // Redirect to the correct student login page
+    header("Location: student/student-login.php"); // Assuming login is in student folder
     exit;
 }
 
@@ -14,7 +15,7 @@ $attendance_records = []; // Initialize an empty array to hold the results
 
 try {
     // Prepare and execute the database query using secure PDO methods
-    $stmt = $conn->prepare("SELECT subject, total_classes, attended_classes FROM attendance WHERE student_id = ?");
+    $stmt = $conn->prepare("SELECT subject, total_classes, attended_classes FROM attendance WHERE student_id = ? ORDER BY subject ASC");
     $stmt->execute([$student_id]);
     
     // Fetch all matching records into the array
@@ -22,7 +23,6 @@ try {
 
 } catch (PDOException $e) {
     // If the database query fails, stop the script and show a generic error
-    // In a real application, you might log the specific error $e->getMessage()
     die("Error: Could not retrieve attendance data at this time. Please try again later.");
 }
 ?>
@@ -33,6 +33,7 @@ try {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>My Attendance</title>
     <style>
+        /* Consistent Styling */
         body { 
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; 
             text-align: center; 
@@ -116,7 +117,7 @@ try {
                             <td>
                                 <?php
                                 // Avoid division by zero if total_classes is 0
-                                if ($row['total_classes'] > 0) {
+                                if (isset($row['total_classes']) && $row['total_classes'] > 0) {
                                     echo round(($row['attended_classes'] / $row['total_classes']) * 100, 2) . '%';
                                 } else {
                                     echo 'N/A';
@@ -128,7 +129,8 @@ try {
                 <?php endif; ?>
             </tbody>
         </table>
-        <a href="student-dashboard.php" class="back-link">Back to Dashboard</a>
+        <!-- Link assumes student dashboard is in a 'student' subfolder -->
+        <a href="student/student-dashboard.php" class="back-link">Back to Dashboard</a> 
     </div>
 </body>
 </html>
