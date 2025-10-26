@@ -11,6 +11,25 @@ if (!isset($_SESSION['student_id'])) {
 // Get email from session for display (ensure it's set during login)
 $student_email = $_SESSION['student_email'] ?? 'Student'; // Default to 'Student' if not set
 
+// --- Optional: Fetch student name from DB ---
+// Uncomment and adapt if you want to display the name
+/*
+include('../db-config.php'); // Include DB connection
+$student_name = 'Student'; // Default name
+try {
+    $stmt = $conn->prepare("SELECT name FROM students WHERE id = ?");
+    $stmt->execute([$_SESSION['student_id']]);
+    $result = $stmt->fetch(PDO::FETCH_ASSOC);
+    if ($result && !empty($result['name'])) {
+        $student_name = $result['name'];
+    }
+} catch (PDOException $e) {
+    // Log error or handle gracefully, don't stop the page
+    error_log("Error fetching student name: " . $e->getMessage());
+}
+$conn = null; // Close connection if opened
+*/
+
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -38,6 +57,7 @@ $student_email = $_SESSION['student_email'] ?? 'Student'; // Default to 'Student
             transition: background-color 0.3s;
             font-size: 16px;
             min-width: 150px; /* Ensure buttons have some width */
+            text-align: center; /* Center text in button */
         }
         .feature-link:hover { background-color: #138496; }
         .logout-btn { 
@@ -55,23 +75,24 @@ $student_email = $_SESSION['student_email'] ?? 'Student'; // Default to 'Student
 </head>
 <body>
     <div class="navbar">
-        <a href="logout.php">Logout</a>
+        <a href="../logout.php">Logout</a> <!-- Corrected path assuming student files are in a subfolder -->
     </div>
 
     <div class="container">
-        <h1>Welcome!</h1>
+        <!-- Replace 'Welcome!' with the name if you fetch it -->
+        <h1>Welcome!</h1> 
         <p>Email: <?= htmlspecialchars($student_email) ?></p>
         
         <div class="features">
             <a href="attendance.php" class="feature-link">View Attendance</a>
             <a href="results.php" class="feature-link">View IA Results</a>
-            <a href="timetable.php" class="feature-link">View Timetable</a>
+            <a href="take-test.php" class="feature-link">Take Assigned Test</a> <!-- Added Link -->
+            <!-- <a href="timetable.php" class="feature-link">View Timetable</a> -->
             <!-- Add more links as features are developed -->
         </div>
 
-        <a href="logout.php" class="logout-btn">Logout</a>
+        <a href="../logout.php" class="logout-btn">Logout</a> <!-- Corrected path -->
     </div>
 </body>
 </html>
-
 
