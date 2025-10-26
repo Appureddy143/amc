@@ -85,7 +85,7 @@ $conn = null; // Close connection if opened
         
         <div class="features">
             <a href="attendance.php" class="feature-link">View Attendance</a>
-            <a href="results.php" class="feature-link">View IA Results</a>
+            <a href="ia-results.php" class="feature-link">View IA Results</a>
             <a href="take-test.php" class="feature-link">Take Assigned Test</a> <!-- Added Link -->
             <!-- <a href="timetable.php" class="feature-link">View Timetable</a> -->
             <!-- Add more links as features are developed -->
@@ -95,4 +95,5 @@ $conn = null; // Close connection if opened
     </div>
 </body>
 </html>
+
 
