@@ -118,7 +118,7 @@ try {
 </head>
 <body>
     <div class="navbar">
-        <a href="admin_dashboard.php">Back to Admin Dashboard</a>
+        <a href="admin-panel.php">Back to Admin Dashboard</a>
         <a href="logout.php">Logout</a>
     </div>
 
@@ -165,4 +165,5 @@ try {
     </div>
 </body>
 </html>
+
 
