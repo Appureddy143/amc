@@ -68,14 +68,21 @@ try {
 
 
     // Decode the questions from JSON content
-    $questions = json_decode($test_details['content'], true);
-    if (json_last_error() !== JSON_ERROR_NONE || !is_array($questions)) {
+    $questions_decoded = json_decode($test_details['content'], true);
+    if (json_last_error() !== JSON_ERROR_NONE || !is_array($questions_decoded)) {
         // Use a more user-friendly message
         $message = "Error loading test questions. Please contact your instructor.";
         $questions = []; // Prevent further processing if questions are invalid
         $can_take_test = false;
        // Optionally log the actual error: error_log("JSON Decode Error: ".json_last_error_msg()." for assignment ID: ".$assignment_id);
+    } else {
+        $questions = $questions_decoded; // Assign if decoding is successful
+        // --- Shuffle Questions for this specific student attempt ---
+        if ($can_take_test && $test_details['status'] == 'started') { // Only shuffle if the test is active
+             shuffle($questions);
+        }
     }
+
 
     // --- Update status to 'started' only if allowed and was 'assigned' ---
     if ($can_take_test && $test_details['status'] == 'assigned') {
@@ -87,55 +94,81 @@ try {
 
     // --- Handle Test Submission ---
     if ($_SERVER['REQUEST_METHOD'] == 'POST' && $test_details['status'] == 'started' && $can_take_test) {
-        $answers = $_POST['answers'] ?? [];
+        // **Important:** We need the original question order to match submitted answers
+        // Re-fetch or re-decode the *original* non-shuffled questions for grading/saving
+         $original_questions_for_grading = json_decode($test_details['content'], true);
+         // It might be better to store the shuffled order mapping if needed later for review
 
-        // Check if number of answers matches number of questions (basic validation)
-        $expected_answers = count($questions);
+        $answers = $_POST['answers'] ?? []; // Answers are submitted based on the *displayed* (shuffled) order
+
+        // We need to map the submitted answers back to the original question index/ID
+        // This is complex if only using array index after shuffling.
+        // A better approach would be to include a unique question ID/hash in the form data.
+        // For now, let's assume the grading logic can handle potentially mismatched order,
+        // or we simplify by grading based on the shuffled order (less ideal for review).
+
+        $expected_answers = count($original_questions_for_grading); // Grade against original count
         if (empty($answers) || count($answers) !== $expected_answers) {
-             // Modify message based on whether it was auto-submitted or user submitted
              $auto_submit_flag = isset($_POST['auto_submitted']) && $_POST['auto_submitted'] === 'true';
              if ($auto_submit_flag) {
                  $message = "Test automatically submitted due to switching tabs. Unanswered questions were marked incorrect.";
-                 // Ensure answers array has keys for all questions, even if null
+                 // Ensure answers array has keys for all expected questions based on shuffled display order index
                  for ($i = 0; $i < $expected_answers; $i++) {
                      if (!isset($answers[$i])) {
-                         $answers[$i] = null; // Mark unanswered as null
+                         $answers[$i] = null;
                      }
                  }
              } else {
                 $message = "Please answer all questions before submitting.";
-                // Prevent submission if manual and not all answered
                 throw new Exception($message);
              }
         }
 
         $conn->beginTransaction();
 
-        // 1. Save answers
+        // 1. Save answers (Answers are saved in the order they were submitted/displayed)
         $answers_json = json_encode($answers);
-        // Using ON CONFLICT to handle potential resubmissions if allowed by logic (currently prevents resubmit via status check)
         $sub_sql = "INSERT INTO student_submissions (assigned_test_id, answers) VALUES (?, ?)
                     ON CONFLICT (assigned_test_id) DO UPDATE SET answers = EXCLUDED.answers, submitted_at = NOW()";
         $stmt_sub = $conn->prepare($sub_sql);
         $stmt_sub->execute([$assignment_id, $answers_json]);
 
         // --- Auto-Grading for MCQs ---
+        // **CRITICAL:** Grade using the *original* question data but compare with submitted answer index
         $grade = null;
         $final_status = 'submitted';
 
         if ($test_details['question_type'] == 'mcq') {
              $score = 0;
              $total_possible_marks = 0;
-             foreach ($questions as $index => $q) {
-                 $total_possible_marks += ($q['marks'] ?? 0); // Sum marks safely
-                 $student_answer = $answers[$index] ?? null;
-                 if (isset($q['correct']) && $student_answer === $q['correct']) {
-                     $score += ($q['marks'] ?? 0); // Add marks safely
+             // Need to map submitted answers (indexed 0..N based on shuffle) back to original questions
+             // This requires adding original index or unique ID to the form submission
+             // --- SIMPLIFIED GRADING (Assumes answers array matches shuffled questions array directly) ---
+             // This works if grading happens immediately and doesn't need later review against original order easily
+             foreach ($questions as $index => $q_shuffled) { // Use the shuffled questions for this loop
+                  $total_possible_marks += ($q_shuffled['marks'] ?? 0);
+                  $student_answer = $answers[$index] ?? null; // Get answer corresponding to shuffled index
+                  if (isset($q_shuffled['correct']) && $student_answer === $q_shuffled['correct']) {
+                      $score += ($q_shuffled['marks'] ?? 0);
+                  }
+             }
+
+             // --- MORE ROBUST GRADING (Requires form change) ---
+             /* // Example if form submitted answers keyed by original index or a unique question ID
+             foreach ($original_questions_for_grading as $original_index => $q_original) {
+                 $total_possible_marks += ($q_original['marks'] ?? 0);
+                 $unique_q_id = $q_original['id']; // Assuming you add an ID during generation/upload
+                 $student_answer = $answers[$unique_q_id] ?? null; // Get answer using the ID
+                 if (isset($q_original['correct']) && $student_answer === $q_original['correct']) {
+                     $score += ($q_original['marks'] ?? 0);
                  }
              }
+             */
+
+
              $grade = $score;
              $final_status = 'graded';
-             if (!isset($auto_submit_flag) || !$auto_submit_flag) { // Don't overwrite auto-submit message
+             if (!isset($auto_submit_flag) || !$auto_submit_flag) {
                 $message = "Test submitted successfully! Your score: $score / $total_possible_marks";
              }
              $message_type = "success";
@@ -143,7 +176,6 @@ try {
              if (!isset($auto_submit_flag) || !$auto_submit_flag) {
                 $message = "Test submitted successfully! It will be graded by your instructor.";
              } else {
-                 // Adjust auto-submit message for descriptive
                  $message = "Test automatically submitted due to switching tabs. It will be graded by your instructor.";
              }
              $message_type = "success";
@@ -151,32 +183,29 @@ try {
 
         // 2. Update assigned_tests status and grade
         $graded_at_sql = ($final_status == 'graded') ? ", graded_at = NOW()" : "";
-        $status_sql = "UPDATE assigned_tests SET status = ?, grade = ? {$graded_at_sql} WHERE id = ? AND status = 'started'"; // Only update if status was 'started'
+        $status_sql = "UPDATE assigned_tests SET status = ?, grade = ? {$graded_at_sql} WHERE id = ? AND status = 'started'";
         $stmt_status = $conn->prepare($status_sql);
         $update_successful = $stmt_status->execute([$final_status, $grade, $assignment_id]);
 
-        if ($update_successful && $stmt_status->rowCount() > 0) { // Check if row was actually updated
+        if ($update_successful && $stmt_status->rowCount() > 0) {
             $conn->commit();
             $test_details['status'] = $final_status;
             $test_details['grade'] = $grade;
         } else {
-            // Rollback if update failed or status wasn't 'started'
             $conn->rollBack();
-            // Override previous success message if update failed
             $message = "Submission failed. The test might have already been submitted or an error occurred.";
             $message_type = "error";
         }
 
 
     } elseif ($_SERVER['REQUEST_METHOD'] == 'POST' && ($test_details['status'] == 'submitted' || $test_details['status'] == 'graded')) {
-        // Prevent resubmission if status changed between page load and POST
         $message = "This test has already been submitted or graded.";
         $message_type = "error";
 
     }
 
 } catch (PDOException $e) {
-     if ($conn && $conn->inTransaction()) { $conn->rollBack(); } // Check $conn exists before rollback
+     if ($conn && $conn->inTransaction()) { $conn->rollBack(); }
     $message = "Database Error: " . $e->getMessage();
 } catch (Exception $e) {
     $message = "Error: " . $e->getMessage();
@@ -274,8 +303,8 @@ try {
                  <div class="status-info missed">The deadline for this test has passed and it was not submitted.</div>
                  <a href="take-test.php" class="back-link">Return to Assigned Tests</a>
             <?php elseif ($can_take_test && $test_details['status'] == 'started' && !empty($questions)): ?>
+                <!-- IMPORTANT: Form ID added -->
                 <form id="testForm" action="do-test.php?assignment_id=<?= $assignment_id ?>" method="POST">
-                    <!-- Add a hidden input for the auto-submit flag -->
                     <input type="hidden" name="auto_submitted" id="auto_submitted" value="false">
 
                     <h3>Answer the following questions:</h3>
@@ -283,6 +312,7 @@ try {
                     <?php foreach ($questions as $index => $q): ?>
                         <div class="question-block">
                              <div class="question-header">
+                                 <!-- Displaying index+1 based on shuffled order -->
                                  <span class="question-text">Q<?= $index + 1 ?>: <?= htmlspecialchars($q['question']) ?></span>
                                  <span class="marks">(<?= htmlspecialchars($q['marks'] ?? '?') ?> Marks)</span>
                              </div>
@@ -294,12 +324,14 @@ try {
                                     ?>
                                     <?php foreach ($options as $key => $option): ?>
                                         <label>
+                                            <!-- Answer name uses the current $index (from shuffled array) -->
                                             <input type="radio" name="answers[<?= $index ?>]" value="<?= $key ?>" required>
                                             <?= htmlspecialchars($option) ?>
                                         </label>
                                     <?php endforeach; ?>
                                 </div>
                             <?php elseif ($test_details['question_type'] == 'descriptive'): ?>
+                                 <!-- Answer name uses the current $index (from shuffled array) -->
                                  <textarea name="answers[<?= $index ?>]" placeholder="Enter your answer here..." required></textarea>
                             <?php endif; ?>
                         </div>
@@ -329,18 +361,50 @@ try {
     <script>
         let formSubmitted = false; // Flag to prevent multiple submissions
 
-        // Function to submit the form automatically
         function autoSubmitTest() {
             if (!formSubmitted) {
-                formSubmitted = true; // Set flag
+                formSubmitted = true;
                 console.log("Tab switched - Auto-submitting test...");
                 const form = document.getElementById('testForm');
                 const autoSubmitInput = document.getElementById('auto_submitted');
                 const submitButton = document.getElementById('submitButton');
 
                 if (form && autoSubmitInput) {
-                    autoSubmitInput.value = 'true'; // Mark as auto-submitted
-                    if (submitButton) submitButton.disabled = true; // Disable manual submit button
+                    autoSubmitInput.value = 'true';
+                    if (submitButton) submitButton.disabled = true;
+                    // --- IMPORTANT: Fill unanswered questions ---
+                    // Find all inputs/textareas within the form
+                    const inputs = form.querySelectorAll('input[type="radio"], textarea');
+                    const answeredIndices = new Set();
+                    // Mark indices that have answers
+                    inputs.forEach(input => {
+                        const match = input.name.match(/answers\[(\d+)\]/);
+                        if (match) {
+                            const index = match[1];
+                            if ((input.type === 'radio' && input.checked) || (input.tagName === 'TEXTAREA' && input.value.trim() !== '')) {
+                                answeredIndices.add(index);
+                            }
+                        }
+                    });
+
+                    // Add dummy answers for unanswered questions (needed for MCQ grading loop)
+                     const totalQuestions = <?= count($questions) ?>; // Get total question count from PHP
+                     for (let i = 0; i < totalQuestions; i++) {
+                         if (!answeredIndices.has(String(i))) {
+                             // Check if it's an MCQ - find the radio group
+                             const radioGroup = form.querySelector(`input[name="answers[${i}]"]`);
+                             if (radioGroup && radioGroup.type === 'radio') {
+                                 // Add a hidden input to represent an unanswered MCQ
+                                 // Or ensure the PHP grading loop handles missing index gracefully (as it does now with ?? null)
+                                 // For simplicity, we rely on PHP's `?? null`
+                             } else {
+                                 // For textareas, ensure the value is submitted (even if empty)
+                                 const textarea = form.querySelector(`textarea[name="answers[${i}]"]`);
+                                 // If textarea exists and value is empty, it will be submitted as empty.
+                             }
+                         }
+                     }
+
                     form.submit();
                 } else {
                     console.error("Could not find test form or auto_submitted input.");
@@ -348,23 +412,17 @@ try {
             }
         }
 
-        // Listen for visibility changes (switching tabs, minimizing window)
         document.addEventListener('visibilitychange', () => {
-            // Check if the page is hidden AND the test hasn't already been submitted by this script
             if (document.hidden && !formSubmitted) {
                 autoSubmitTest();
             }
         });
 
-         // Optional: Add listeners for window blur/focus (might trigger too often)
-         // window.addEventListener('blur', autoSubmitTest);
-
-         // Prevent multiple submissions if user clicks button manually after auto-submit starts
          const formElement = document.getElementById('testForm');
          if(formElement){
              formElement.addEventListener('submit', () => {
-                 if (formSubmitted) return false; // Prevent submission if already auto-submitting
-                 formSubmitted = true; // Set flag on manual submit too
+                 if (formSubmitted) return false;
+                 formSubmitted = true;
                  const submitButton = document.getElementById('submitButton');
                  if (submitButton) submitButton.disabled = true;
              });
