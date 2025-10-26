@@ -2,7 +2,7 @@
 session_start();
 session_unset(); // Remove all session variables
 session_destroy(); // Destroy the session
-header("Location: /student-login"); // Redirect to login page
+header("Location: /index.php"); // Redirect to login page
 exit;
 ?>
 ```
@@ -14,3 +14,4 @@ exit;
     $hashed_password = password_hash('student_password', PASSWORD_DEFAULT);
     // Store $hashed_password in the database
     
+
