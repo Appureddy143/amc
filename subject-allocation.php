@@ -1,4 +1,4 @@
-here<?php
+<?php
 session_start();
 // 1. Include the correct PDO database connection
 include('db-config.php'); 
@@ -67,13 +67,13 @@ try {
     }
 
     // --- Fetch staff members for the dropdown ---
-    $staff_stmt = $conn->prepare("SELECT id, first_name, surname FROM users WHERE role = 'staff' ORDER BY first_name, surname");
+    $staff_stmt = $conn->prepare("SELECT id, first_name, surname FROM users WHERE role IN ('staff', 'hod', 'principal') ORDER BY first_name, surname"); // Include HOD/Principal?
     $staff_stmt->execute();
     $staff_members = $staff_stmt->fetchAll(PDO::FETCH_ASSOC);
 
     // --- Fetch subjects for the multi-select ---
     // Show all subjects, let the admin decide which ones to allocate
-    $subject_stmt = $conn->prepare("SELECT id, name AS subject_name, subject_code FROM subjects ORDER BY name");
+    $subject_stmt = $conn->prepare("SELECT id, name AS subject_name, subject_code, branch, semester FROM subjects ORDER BY name");
     $subject_stmt->execute();
     $available_subjects = $subject_stmt->fetchAll(PDO::FETCH_ASSOC);
 
@@ -103,19 +103,21 @@ try {
         h2 { text-align: center; margin-bottom: 1.5em; color: #444;}
         form { display: flex; flex-direction: column; gap: 1.2em; }
         form label { font-weight: bold; color: #555; }
-        form select { padding: 0.75em; border: 1px solid #ddd; border-radius: 5px; font-size: 1em; }
-        form select[multiple] { height: 150px; /* Make multiple select taller */ }
-        form p { font-size: 0.9em; color: #777; margin-top: -0.5em; }
-        form button { background-color: #28a745; color: #fff; border: none; padding: 0.75em 1.5em; border-radius: 5px; cursor: pointer; font-size: 1em; font-weight: bold; transition: background-color 0.3s ease; }
+        form select { padding: 0.75em; border: 1px solid #ddd; border-radius: 5px; font-size: 1em; width: 100%; box-sizing: border-box; }
+        form select[multiple] { height: 200px; /* Make multiple select taller */ }
+        form p { font-size: 0.9em; color: #777; margin-top: -0.5em; margin-bottom: 0.5em; }
+        form button { background-color: #28a745; color: #fff; border: none; padding: 0.75em 1.5em; border-radius: 5px; cursor: pointer; font-size: 1em; font-weight: bold; transition: background-color 0.3s ease; align-self: center; /* Center button */ width: auto; /* Allow button to size */ }
         form button:hover { background-color: #218838; }
-        .message { padding: 15px; margin-bottom: 20px; border-radius: 5px; width: 100%; box-sizing: border-box; text-align: center; font-size: 16px; }
-        .message.success { background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
-        .message.error { background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .message { padding: 15px; margin-bottom: 20px; border-radius: 5px; width: 100%; box-sizing: border-box; text-align: center; font-size: 16px; border: 1px solid transparent;}
+        .message.success { background-color: #d4edda; color: #155724; border-color: #c3e6cb; }
+        .message.error { background-color: #f8d7da; color: #721c24; border-color: #f5c6cb; }
+         .back-link { display: block; margin-top: 20px; text-align: center; color: #007bff; }
     </style>
 </head>
 <body>
     <div class="navbar">
-        <a href="admin-panel.php">Back to Admin Dashboard</a>
+        <a href="admin_dashboard.php">Back to Admin Dashboard</a>
+        <a href="logout.php">Logout</a>
     </div>
 
     <div class="content">
@@ -131,7 +133,7 @@ try {
         <form action="subject-allocation.php" method="POST">
             <label for="staff_id">Select Staff Member:</label>
             <select name="staff_id" id="staff_id" required>
-                <option value="">-- Select Staff --</option>
+                <option value="" disabled selected>-- Select Staff --</option>
                 <?php foreach ($staff_members as $staff): ?>
                     <option value="<?= htmlspecialchars($staff['id']) ?>">
                         <?= htmlspecialchars($staff['first_name'] . ' ' . $staff['surname']) ?>
@@ -146,18 +148,18 @@ try {
             <select name="subject_ids[]" id="subject_ids" multiple required>
                  <?php foreach ($available_subjects as $subject): ?>
                     <option value="<?= htmlspecialchars($subject['id']) ?>">
-                        <?= htmlspecialchars($subject['subject_code'] . ' - ' . $subject['subject_name']) ?>
+                        <?= htmlspecialchars($subject['subject_code'] . ' - ' . $subject['subject_name'] . ' (Sem ' . $subject['semester'] . ', ' . $subject['branch'] . ')') ?>
                     </option>
                 <?php endforeach; ?>
                  <?php if(empty($available_subjects)): ?>
                      <option value="" disabled>No subjects available to allocate.</option>
-                <?php endif; ?>
+                 <?php endif; ?>
             </select>
             <p>Hold Ctrl (or Cmd on Mac) to select multiple subjects.</p>
 
             <button type="submit">Allocate Selected Subjects</button>
         </form>
+         <a href="admin_dashboard.php" class="back-link">Cancel</a>
     </div>
 </body>
 </html>
-
