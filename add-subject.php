@@ -82,7 +82,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 <body>
 
     <div class="navbar">
-        <a href="admin_dashboard.php">Back to Admin Dashboard</a>
+        <a href="admin-panel.php">Back to Admin Dashboard</a>
     </div>
 
     <div class="content">
