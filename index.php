@@ -187,7 +187,7 @@ a:hover {
         
         <div class="buttons">
             <a href="login.php" class="button">Staff Login</a>
-            <a href="student-corner.php" class="button">Student Corner</a>
+            <a href="student-dashboard.php" class="button">Student Corner</a>
         </div>
     </div>
 
@@ -202,3 +202,4 @@ a:hover {
     </script>
 </body>
 </html>
+
